@@ -1,0 +1,25 @@
+# Install this bundle into a normal DeepSeek Harness profile. The Harness MCP
+# client launches the Python domain engine from the configured Triton-RISCV checkout.
+- insert:
+    - id: triton-riscv-domain-policy
+      name: dsh-triton-riscv
+
+    - id: mcp-triton-riscv
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: triton_riscv
+        transport: stdio
+        command: !!js process.env.TRITON_RISCV_MCP_PYTHON ?? 'python3'
+        args: ['-m', 'codex_agent.harness.mcp_server']
+        env:
+          TRITON_RISCV_REPO_ROOT: !!js process.env.TRITON_RISCV_CHECKOUT ?? process.env.DSH_CWD ?? process.cwd()
+          TRITON_RISCV_ALLOW_VALIDATION: !!js process.env.TRITON_RISCV_ALLOW_VALIDATION ?? '0'
+          TRITON_RISCV_ALLOW_REPAIR_APPLY: !!js process.env.TRITON_RISCV_ALLOW_REPAIR_APPLY ?? '0'
+          TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY: !!js process.env.TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY ?? '0'
+          TRITON_RISCV_REQUIRE_REMOTE: !!js process.env.TRITON_RISCV_REQUIRE_REMOTE ?? '0'
+          TRITON_RISCV_REQUIRE_APPROVED_VALIDATION: !!js process.env.TRITON_RISCV_REQUIRE_APPROVED_VALIDATION ?? '1'
+          RISCV_HOST: !!js process.env.RISCV_HOST ?? ''
+          RISCV_REPO: !!js process.env.RISCV_REPO ?? ''
+        cwd: !!js process.env.TRITON_RISCV_CHECKOUT ?? process.env.DSH_CWD ?? process.cwd()
+        toolCallTimeoutMs: 960000
+        failOnStartupError: true
