@@ -12,6 +12,8 @@ The bundle adds two Cordis rows to an existing Harness profile:
 2. The official Harness MCP client starts
    `python -m codex_agent.harness.mcp_server` and exposes its typed tools as
    `mcp__triton_riscv__*`.
+3. A Harness Web client plugin occupies the root UI slot and displays the
+   existing Triton-RISCV React/FastAPI workbench.
 
 The model and Agent loop remain owned by Harness. Discovery, contract checking,
 source proposals, validation, diagnosis, bounded repair, remote SSH execution,
@@ -45,14 +47,22 @@ checkout:
 ```sh
 export TRITON_RISCV_CHECKOUT=/absolute/path/to/triton-riscv
 export TRITON_RISCV_MCP_PYTHON="$TRITON_RISCV_CHECKOUT/.harness-venv/bin/python"
+export TRITON_RISCV_WORKBENCH_PORT=8765
 dsh plugin --profile web add ./plugins/dsh-triton-riscv
 dsh --profile web --dump-config
 dsh web
 ```
 
 The config dump should contain both `triton-riscv-domain-policy` and
-`mcp-triton-riscv`. A real Harness boot proves that the Python MCP process
-starts from `TRITON_RISCV_CHECKOUT` and publishes its tools.
+`mcp-triton-riscv`. Starting `dsh web` also starts the Python workbench and the
+Harness page displays that workbench in its root slot. Add `?nativeHarness=1`
+to the Harness URL when the stock Harness interface is needed.
+
+The embedded client defaults to `http://127.0.0.1:8765`. For a different port
+or externally hosted workbench, open the Harness URL with an encoded
+`?tritonWorkbenchUrl=https://host/path` query parameter. Set
+`TRITON_RISCV_WORKBENCH_AUTOSTART=0` when that external service is already
+managed by another process.
 
 For read-only discovery, no RISC-V server is required. Try:
 
@@ -98,7 +108,7 @@ npm pack --dry-run
 The tests check the bundle manifest, Cordis rows, safe default switches, and
 system-prompt lifecycle registration without starting a model or remote host.
 
-## Existing Triton-RISCV Demo Platform
+## Standalone Triton-RISCV Demo Platform
 
 The React and FastAPI workbench remains in the Triton-RISCV checkout and can
 load the same plugin policy and MCP server:
@@ -108,9 +118,8 @@ cd "$TRITON_RISCV_CHECKOUT"
 .harness-venv/bin/python -m codex_agent.platform --port 8765
 ```
 
-Open `http://127.0.0.1:8765`. The custom workbench remains a development and
-demonstration host; installing this bundle into another Harness profile uses
-that Harness installation's own UI.
+Open `http://127.0.0.1:8765`. This standalone command remains useful while
+developing the workbench without starting a complete Harness profile.
 
 ## Remove
 
@@ -120,7 +129,7 @@ dsh plugin --profile web remove dsh-triton-riscv
 
 ## Current Boundary
 
-This bundle packages the model-facing policy and MCP connection, while the
-Python domain engine stays in the target Triton-RISCV checkout. A later release
-can publish that engine as a separate Python package so the bundle no longer
-depends on a source checkout.
+This bundle packages the model-facing policy, MCP connection, and Harness Web
+entry. The Python domain engine and compiled React assets stay in the target
+Triton-RISCV checkout. A later release can publish that engine and its assets
+independently so the bundle no longer depends on a source checkout.
