@@ -1,0 +1,25 @@
+{
+  "name": "@dangosys/harness",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.18.0",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "test": "vitest run --project unit",
+    "test:integration": "vitest run --project integration",
+    "test:all": "vitest run"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "semi": false,
+    "trailingComma": "all",
+    "arrowParens": "avoid",
+    "printWidth": 120
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6",
+    "vitest": "^4.1.8"
+  }
+}

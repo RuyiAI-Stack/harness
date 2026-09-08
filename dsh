@@ -1,0 +1,16 @@
+#!/usr/bin/env python3
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+DSH = ROOT / "thirdparty" / "deepseek-harness"
+BIN = DSH / "apps" / "cli" / "src" / "bin.ts"
+
+os.environ["CI"] = "true"
+os.environ["DSH_HOME"] = str(ROOT / ".dsh")
+os.environ["DSH_PROFILE"] = "web"
+
+cmd = ["node", "--expose-internals", "--import", "tsx/esm", str(BIN), *sys.argv[1:]]
+raise SystemExit(subprocess.call(cmd, cwd=DSH))

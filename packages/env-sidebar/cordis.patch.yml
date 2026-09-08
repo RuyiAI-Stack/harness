@@ -1,0 +1,3 @@
+- insert:
+    - id: env-sidebar
+      name: '@dangosys/dsh-env-sidebar'

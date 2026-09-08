@@ -1,0 +1,13 @@
+node_modules/
+lib/
+*.tgz
+.DS_Store
+.env
+.dsh/*
+!.dsh/skills
+!.dsh/skills/**
+superpowers/
+environment/
+coverage/
+.vitest/
+test-results/

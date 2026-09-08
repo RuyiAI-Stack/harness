@@ -1,0 +1,3 @@
+- insert:
+    - id: tool-workload-integration
+      name: '@dangosys/dsh-workload-integration'

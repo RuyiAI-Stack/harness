@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pre-commit:
+    name: pre-commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+
+      - name: Install repository dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install pre-commit
+        run: python -m pip install --disable-pip-version-check pre-commit
+
+      - name: Check formatting
+        run: pre-commit run --all-files --show-diff-on-failure --color=always
+
+  test:
+    name: vitest
+    needs: pre-commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.18.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.18.0
+          cache: pnpm
+
+      - name: Prepare environment
+        run: cp .env.example .env
+
+      - name: Install and build repository
+        run: ./tools/scripts/install-all.sh
+
+      - name: Run tests
+        run: pnpm test:all
