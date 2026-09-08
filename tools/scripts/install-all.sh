@@ -43,9 +43,9 @@ pnpm dsh plugin --profile web add "$ROOT"/packages/*/
 # ===------------------------------------------------------===#
 # Step 6. Install third-party plugins from npm
 # ===------------------------------------------------------===#
-PROFILE="$ROOT/.dsh/profiles/web"; 
-set +e; 
-pnpm dsh plugin --profile web add dsh-better-sidebar@latest; 
-set -e; 
-(cd "$PROFILE" && pnpm approve-builds --all); 
+PROFILE="$ROOT/.dsh/profiles/web";
+set +e;
+pnpm dsh plugin --profile web add dsh-better-sidebar@latest;
+set -e;
+(cd "$PROFILE" && pnpm approve-builds --all);
 pnpm dsh plugin --profile web add dsh-better-sidebar@latest
