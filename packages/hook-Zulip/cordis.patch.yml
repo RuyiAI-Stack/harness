@@ -1,5 +1,0 @@
-- insert:
-    - id: hook-zulip
-      name: '@dangosys/dsh-hook-zulip'
-      config:
-        tokenFile: /path/to/zulip-outgoing-webhook-token

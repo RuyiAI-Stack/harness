@@ -12,7 +12,7 @@ export function defineExistingModelsIndexTool(repoPath: () => string) {
     description:
       '列出本地已有 ModelTest e2e 模型及其粗特征，并给出新 workload 必须改动的' +
       '精确注册点。用于挑选同类最近邻参考，并正确完成新 workload 的注册。' +
-      '需要先 ensure_repo({ name: "buckyball" })。',
+      '需要先 env_ensure_component({ name: "buckyball" })。',
     parameters: {},
     output: {
       schema: { type: 'string' },

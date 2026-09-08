@@ -1,0 +1,33 @@
+# Copy to config.yml, fill values, then run install-all.sh.
+# install-all / ./dsh copies config.yml to $DSH_HOME/profiles/web/cordis.patch.yml.
+# Each entry replaces the whole `config` for that row id (no deep merge).
+#
+# DeepSeek API key: DEEPSEEK_API_KEY=<key> ./dsh web
+# GitHub CLI (`gh pr create`): run `gh auth login`
+
+- id: github-bot
+  config:
+    # [Optional] Only Need for Cloud Agent Deployment
+    # Example:
+    # orgs:
+    #   organization-name:
+    #     appId: 0
+    #     privateKeyFile: /absolute/path/to/app.pem
+    orgs: {}
+
+- id: hook-github
+  config:
+    # [Optional] GitHub webhook shared secret
+    secret: ''
+
+- id: hook-zulip
+  config:
+    # [Optional] Zulip outgoing-webhook bot token
+    token: ''
+
+- id: tool-workload-integration
+  config:
+    # [Required] HuggingFace Read token (gated/private models)
+    hfToken: ''
+    # [Optional] HuggingFace API base URL
+    hfEndpoint: https://huggingface.co

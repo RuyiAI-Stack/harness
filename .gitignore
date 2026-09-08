@@ -3,6 +3,7 @@ lib/
 *.tgz
 .DS_Store
 .env
+config.yml
 .dsh/*
 !.dsh/skills
 !.dsh/skills/**
@@ -11,3 +12,4 @@ environment/
 coverage/
 .vitest/
 test-results/
+*.pem

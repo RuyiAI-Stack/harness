@@ -81,7 +81,7 @@ export function defineWorkloadAuditTool(repoPath: () => string) {
       '对一个初始适配阶段的 ModelTest e2e workload 做只读终检：模型目录存在、' +
       'canonical 参考输出产物存在、三处注册项齐全、HANDOFF.md 含规定小节。' +
       '在本地 CPU（或超时后的 GPU）跑通并与参考对齐之后调用；交付要求 ACCEPT。' +
-      '需要先 ensure_repo({ name: "buckyball" })。',
+      '需要先 env_ensure_component({ name: "buckyball" })。',
     parameters: {
       model: {
         type: 'string',

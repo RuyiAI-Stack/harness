@@ -6,14 +6,22 @@ export default defineConfig({
       {
         test: {
           name: 'unit',
-          include: ['packages/*/tests/unit/**/*.spec.ts', 'tests/unit/**/*.spec.ts'],
+          include: [
+            'packages/*/tests/unit/**/*.spec.ts',
+            'packages/*/*/tests/unit/**/*.spec.ts',
+            'tests/unit/**/*.spec.ts',
+          ],
           environment: 'node',
         },
       },
       {
         test: {
           name: 'integration',
-          include: ['packages/*/tests/integration/**/*.spec.ts', 'tests/integration/**/*.spec.ts'],
+          include: [
+            'packages/*/tests/integration/**/*.spec.ts',
+            'packages/*/*/tests/integration/**/*.spec.ts',
+            'tests/integration/**/*.spec.ts',
+          ],
           environment: 'node',
           hookTimeout: 120_000,
           testTimeout: 120_000,

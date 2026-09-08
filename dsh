@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -7,9 +8,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 DSH = ROOT / "thirdparty" / "deepseek-harness"
 BIN = DSH / "apps" / "cli" / "src" / "bin.ts"
+HOME = ROOT / ".dsh"
+CFG = ROOT / "config.yml"
+PATCH = HOME / "profiles" / "web" / "cordis.patch.yml"
+
+if not os.environ.get("DEEPSEEK_API_KEY", "").strip():
+    raise SystemExit("usage: DEEPSEEK_API_KEY=<key> ./dsh <dsh-args...>")
+
+if not CFG.is_file():
+    raise SystemExit(f"missing {CFG}: cp config.yml.example config.yml and fill required fields")
+
+PATCH.parent.mkdir(parents=True, exist_ok=True)
+shutil.copyfile(CFG, PATCH)
 
 os.environ["CI"] = "true"
-os.environ["DSH_HOME"] = str(ROOT / ".dsh")
+os.environ["DSH_HOME"] = str(HOME)
 os.environ["DSH_PROFILE"] = "web"
 
 cmd = ["node", "--expose-internals", "--import", "tsx/esm", str(BIN), *sys.argv[1:]]

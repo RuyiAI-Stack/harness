@@ -62,7 +62,7 @@ jobs:
           cache: pnpm
 
       - name: Prepare environment
-        run: cp .env.example .env
+        run: cp config.yml.example config.yml
 
       - name: Install and build repository
         run: ./tools/scripts/install-all.sh

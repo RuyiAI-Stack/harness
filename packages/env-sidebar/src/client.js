@@ -73,7 +73,7 @@ window.__ModuleLoader__.load({
       if (type.includes('application/json')) return JSON.parse(text)
       return text
     }
-    async function addWatchlist(repo) {
+    async function addRepoList(repo) {
       const res = await fetch(ROLE_REPOS, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -338,15 +338,15 @@ window.__ModuleLoader__.load({
                           selRepo &&
                           h(
                             Tooltip,
-                            { key: 'wl', label: 'Add selected to watchlist', side: 'bottom', delayMs: 500 },
+                            { key: 'wl', label: 'Add selected to repoList', side: 'bottom', delayMs: 500 },
                             h(
                               'button',
                               {
                                 type: 'button',
                                 className: 'dsh-env-icon',
-                                'aria-label': 'Add selected to watchlist',
+                                'aria-label': 'Add selected to repoList',
                                 disabled: busy,
-                                onClick: () => void run(() => addWatchlist(selRepo)),
+                                onClick: () => void run(() => addRepoList(selRepo)),
                               },
                               h(IconProjectAddOutline16),
                             ),

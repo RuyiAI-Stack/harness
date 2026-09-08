@@ -1,12 +1,12 @@
 [submodule "packages/singularity"]
 	path = packages/singularity
 	url = https://github.com/DangoSys/singularity.git
-[submodule "packages/open-source-collaboration"]
-	path = packages/open-source-collaboration
-	url = https://github.com/shirohasuki/open-source-collaboration.git
 [submodule "thirdparty/deepseek-harness"]
 	path = thirdparty/deepseek-harness
 	url = https://github.com/deepseek-ai/deepseek-harness.git
 [submodule ".dsh/skills"]
 	path = .dsh/skills
 	url = https://github.com/RuyiAI-Stack/skills.git
+[submodule "packages/collaboration"]
+	path = packages/collaboration
+	url = https://github.com/RuyiAI-Stack/dsh-osc.git

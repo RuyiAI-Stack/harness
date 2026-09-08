@@ -1,5 +1,0 @@
-- insert:
-    - id: hook-github
-      name: '@dangosys/dsh-hook-github'
-      config:
-        secretFile: /path/to/github-webhook-secret
