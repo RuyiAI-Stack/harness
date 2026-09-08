@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { spawnSync } from 'node:child_process'
-import { EnvStore } from '../../src/store.ts'
+import { EnvStore } from '../../src/service/store.ts'
 
 describe('EnvStore', () => {
   let root: string
@@ -69,6 +69,26 @@ describe('EnvStore', () => {
     const env2 = store.create()
     store.select(env2.id)
     expect(store.selectedRepo()).toBeUndefined()
+  })
+
+  it('registerComponent records a cloned repo', () => {
+    const bare = join(root, 'bare2.git')
+    mkdirSync(bare)
+    expect(spawnSync('git', ['init', '--bare', bare]).status).toBe(0)
+    const env = store.create()
+    const dir = join(env.path, 'local', 'seeded')
+    expect(spawnSync('git', ['clone', bare, dir]).status).toBe(0)
+    expect(() => store.registerComponent(env.id, 'local/seeded')).toThrow(/origin/)
+    const man = store.load()
+    const rec = man.environments.find(e => e.id === env.id)!
+    rec.components = []
+    writeFileSync(join(root, 'manifest.json'), `${JSON.stringify(man, null, 2)}\n`)
+    expect(
+      spawnSync('git', ['-C', dir, 'remote', 'set-url', 'origin', 'https://github.com/local/seeded.git']).status,
+    ).toBe(0)
+    const path = store.registerComponent(env.id, 'local/seeded')
+    expect(path).toBe(dir)
+    expect(store.get(env.id).components[0].status).toBe('ready')
   })
 
   it('addComponent clones and reset cleans', () => {

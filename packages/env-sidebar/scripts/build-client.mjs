@@ -1,8 +1,7 @@
-import { copyFileSync, mkdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { resolve } from 'node:path'
 
-const here = dirname(fileURLToPath(import.meta.url))
-const root = join(here, '..')
-mkdirSync(join(root, 'lib'), { recursive: true })
-copyFileSync(join(root, 'src/client.js'), join(root, 'lib/client.js'))
+const root = resolve(import.meta.dirname, '..')
+const body = await readFile(resolve(root, 'src/frontend/client.js'), 'utf8')
+await mkdir(resolve(root, 'lib'), { recursive: true })
+await writeFile(resolve(root, 'lib/client.js'), body)

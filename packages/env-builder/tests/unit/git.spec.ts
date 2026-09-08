@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { cloneRepo, remoteOriginUrl } from '../../src/git.ts'
+import { cloneRepo, remoteOriginUrl } from '../../src/service/git.ts'
 
 describe('cloneRepo', () => {
   let root: string

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nextProjectId } from '../../src/ids.ts'
+import { nextProjectId } from '../../src/service/ids.ts'
 
 describe('nextProjectId', () => {
   it('starts at project1', () => {

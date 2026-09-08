@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { HttpError, statusOf } from '../../src/http.ts'
+import { HttpError, statusOf } from '../../src/web/libs/http.ts'
 
 describe('statusOf', () => {
   it('uses HttpError status when present', () => {

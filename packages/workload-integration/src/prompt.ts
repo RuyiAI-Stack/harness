@@ -1,8 +1,3 @@
-/**
- * ModelTest e2e workload playbook for the initial, chip-agnostic stage.
- * @module dsh-workload-integration/prompt
- */
-
 export function playbookText(repoPath: string): string {
   const modelsRoot = `${repoPath}/bb-tests/workloads/src/ModelTest/e2e/models/models`
   return `# Buckyball ModelTest e2e workload（初始模型适配）

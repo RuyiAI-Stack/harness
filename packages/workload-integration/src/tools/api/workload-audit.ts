@@ -1,9 +1,3 @@
-/**
- * Read-only completion checks for one generated ModelTest e2e workload at the
- * initial model-adaptation stage.
- * @module dsh-workload-integration/tools/workload-audit
- */
-
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'

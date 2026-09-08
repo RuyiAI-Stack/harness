@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseRepoRef } from '../../src/parse.ts'
+import { parseRepoRef } from '../../src/service/parse.ts'
 
 describe('parseRepoRef', () => {
   it('parses owner/repo', () => {

@@ -16,9 +16,22 @@ window.__ModuleLoader__.load({
     const API = '/integrations/env-builder'
     const ROLE_REPOS = '/integrations/role/repos'
     const STYLE_ID = 'dsh-env-sidebar-style'
+    const NS = 'sidebarEnvironments'
+    const TAB_ID = '@dangosys/dsh-env-sidebar'
+    const ENV_KIND = 'environments'
+    const zh = {
+      'type.label': '环境',
+      'guide.title': '环境',
+      'guide.description': '通过当前 agent 创建环境并安装仓库。',
+    }
+    const en = {
+      'type.label': 'Environments',
+      'guide.title': 'Environments',
+      'guide.description': 'Create environments and install repositories through the current agent.',
+    }
     const STATUSES = new Set(['ready', 'modified', 'installing'])
     const CSS = `
-.dsh-env-root{--dsh-env-panel:var(--dsw-alias-bg-secondary,#f3f5f8);--dsh-env-surface:var(--dsw-alias-bg-primary,#fff);--dsh-env-surface-muted:var(--dsw-alias-bg-tertiary,#f8fafc);--dsh-env-border:var(--dsw-alias-border-l3,#dfe4eb);--dsh-env-text:var(--dsw-alias-label-primary,#1f2937);--dsh-env-muted:var(--dsw-alias-label-tertiary,#8993a3);display:flex;flex-direction:column;gap:10px;padding:10px;min-height:0;height:100%;box-sizing:border-box;background:var(--dsh-env-panel);font:13px system-ui;color:var(--dsh-env-text)}
+.dsh-env-root{--dsh-env-panel:var(--dsw-alias-bg-secondary,#f3f5f8);--dsh-env-surface:var(--dsw-alias-bg-primary,#fff);--dsh-env-surface-muted:var(--dsw-alias-bg-tertiary,#f8fafc);--dsh-env-border:var(--dsw-alias-border-l3,#dfe4eb);--dsh-env-text:var(--dsw-alias-label-primary,#1f2937);--dsh-env-muted:var(--dsw-alias-label-tertiary,#8993a3);display:flex;flex:1 1 auto;flex-direction:column;gap:10px;min-height:0;min-width:0;overflow:auto;padding:10px;box-sizing:border-box;background:var(--dsh-env-panel);font:13px system-ui;color:var(--dsh-env-text)}
 @media (prefers-color-scheme:dark){.dsh-env-root{--dsh-env-panel:var(--dsw-alias-bg-secondary,#171b23);--dsh-env-surface:var(--dsw-alias-bg-primary,#1c212b);--dsh-env-surface-muted:var(--dsw-alias-bg-tertiary,#202733);--dsh-env-border:var(--dsw-alias-border-l3,#303846);--dsh-env-text:var(--dsw-alias-label-primary,#e5e7eb);--dsh-env-muted:var(--dsw-alias-label-tertiary,#8d98aa)}}
 .dsh-env-header{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:30px}
 .dsh-env-title{font-weight:650;font-size:15px;letter-spacing:-.01em;color:var(--dsh-env-text)}
@@ -142,7 +155,7 @@ window.__ModuleLoader__.load({
       return roots.map(node)
     }
 
-    function EnvironmentsBrowser({ wide, openSession, sessionsList }) {
+    function EnvironmentsBrowser({ wide, openSession, sessionsList, ask, label }) {
       const [envs, setEnvs] = useState([])
       const [sel, setSel] = useState(null)
       const [selRepo, setSelRepo] = useState(null)
@@ -186,7 +199,7 @@ window.__ModuleLoader__.load({
       }
 
       if (!wide) {
-        return h('div', { className: 'dsh-env-root', title: 'Environments' }, 'E')
+        return h('div', { className: 'dsh-env-root', title: label }, label.slice(0, 1))
       }
 
       return h(
@@ -195,7 +208,7 @@ window.__ModuleLoader__.load({
         h(
           'div',
           { className: 'dsh-env-header' },
-          h('span', { className: 'dsh-env-title' }, 'Environments'),
+          h('span', { className: 'dsh-env-title' }, label),
           h(
             'div',
             { className: 'dsh-env-actions' },
@@ -224,7 +237,7 @@ window.__ModuleLoader__.load({
                       className: 'dsh-env-icon',
                       'aria-label': 'New environment',
                       disabled: busy,
-                      onClick: () => run(() => api('POST', '/environments')),
+                      onClick: () => run(() => ask('Create a new environment with env_create.')),
                     },
                     h(IconProjectAddOutline16),
                   ),
@@ -311,7 +324,9 @@ window.__ModuleLoader__.load({
                                 const repo = window.prompt('GitHub owner/repo or URL')
                                 if (!repo) return
                                 void run(() =>
-                                  api('POST', `/environments/${encodeURIComponent(e.id)}/components`, { repo }),
+                                  ask(
+                                    `Install repository ${repo} into environment ${e.id} at ${e.path}: clone with bash, build per the repo docs, then env_register_component.`,
+                                  ),
                                 )
                               },
                             },
@@ -432,6 +447,9 @@ window.__ModuleLoader__.load({
     }
 
     function apply(ctx) {
+      const t = ctx.locale.bind(NS)
+      ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'env-sidebar: locale')
+
       ctx.effect(() => {
         const style = document.createElement('style')
         style.id = STYLE_ID
@@ -439,22 +457,62 @@ window.__ModuleLoader__.load({
         document.head.appendChild(style)
         return () => style.remove()
       }, 'env-sidebar')
-      function Browser(props) {
+
+      async function ask(text) {
+        const current = ctx.sessions.list.getSnapshot().current
+        if (current === undefined) throw new Error('env-sidebar: no current session')
+        const binding = ctx.sessions.binding(current)
+        if (binding === undefined) throw new Error('env-sidebar: session binding missing for ' + current)
+        const { requestId, abandon } = binding.session.beginSubmission({ text })
+        const result = await binding.session.prompt([{ type: 'text', text }], 'queue', undefined, requestId)
+        if (!result.ok) {
+          abandon()
+          throw new Error(result.error?.message || String(result.error))
+        }
+      }
+
+      function EnvironmentsBody() {
+        const label = t('type.label')
         return h(EnvironmentsBrowser, {
-          ...props,
+          wide: true,
+          label,
           sessionsList: ctx.sessions.list,
           openSession: sid => {
             ctx.sessions.open(sid)
           },
+          ask,
         })
       }
-      ctx.slots.inject('sidebar.workspaces', () =>
-        ctx.slots.register({ name: 'sidebar.workspaces', priority: -10 }, Browser),
+
+      ctx.effect(
+        () =>
+          ctx.sidebarRightTabs.register({
+            id: TAB_ID,
+            kind: ENV_KIND,
+            priority: 'builtin',
+            title: () => t('type.label'),
+            guide: [
+              {
+                order: 20,
+                title: () => t('guide.title'),
+                description: () => t('guide.description'),
+                icon: IconProjectAddOutline16,
+              },
+            ],
+          }),
+        'env-sidebar: tab type',
+      )
+      ctx.effect(
+        () =>
+          ctx.slots.inject('sidebar.right.pane.tab', () =>
+            ctx.slots.register({ name: 'sidebar.right.pane.tab', key: TAB_ID, locale: NS }, EnvironmentsBody),
+          ),
+        'env-sidebar: tab body',
       )
     }
 
     module.exports.apply = apply
-    module.exports.inject = ['slots', 'sessions']
+    module.exports.inject = ['slots', 'sessions', 'sidebarRightTabs', 'locale']
     return module.exports
   },
 })

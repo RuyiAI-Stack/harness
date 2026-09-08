@@ -168,6 +168,25 @@ export class EnvStore {
     return dir
   }
 
+  registerComponent(envId: string, ref: string): string {
+    const parsed = parseRepoRef(ref)
+    const manifest = this.load()
+    const env = manifest.environments.find(e => e.id === envId)
+    if (!env) throw new Error(`env-builder: unknown environment ${envId}`)
+    if (env.components.some(c => c.dir === parsed.dir)) {
+      throw new Error(`env-builder: duplicate component dir ${parsed.dir} in ${envId}`)
+    }
+    const dir = join(env.path, parsed.dir)
+    if (!existsSync(join(dir, '.git'))) throw new Error(`env-builder: component not present at ${dir}`)
+    const origin = remoteOriginUrl(dir)
+    if (origin.replace(/\.git$/, '') !== parsed.url.replace(/\.git$/, '')) {
+      throw new Error(`env-builder: component ${parsed.dir} origin ${origin} != ${parsed.url}`)
+    }
+    env.components.push({ ...parsed, status: 'ready' })
+    this.save(manifest)
+    return dir
+  }
+
   async addComponent(envId: string, ref: string): Promise<string> {
     const parsed = parseRepoRef(ref)
     const manifest = this.load()

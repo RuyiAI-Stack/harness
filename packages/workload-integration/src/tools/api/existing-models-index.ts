@@ -1,7 +1,3 @@
-/**
- * @module dsh-workload-integration/tools/existing-models-index
- */
-
 import { readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'

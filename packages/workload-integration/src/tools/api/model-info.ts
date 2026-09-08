@@ -1,11 +1,6 @@
-/**
- * `buckyball_model_info` tool: fetch a HuggingFace model repo snapshot
- * (metadata + file list) via the Hub API.
- * @module dsh-workload-integration/tools/model-info
- */
-
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { EnvHttpProxyAgent, ProxyAgent, Socks5ProxyAgent, fetch as undiciFetch, type Dispatcher } from 'undici'
+import type { Config } from '../../config.ts'
 
 function hfDispatcher(): Dispatcher {
   for (const name of ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'ALL_PROXY', 'all_proxy']) {
@@ -21,12 +16,6 @@ function hfDispatcher(): Dispatcher {
 
 const hfAgent = hfDispatcher()
 
-export interface ModelInfoConfig {
-  fetchTimeoutMs: number
-  hfToken: string
-  hfEndpoint: string
-}
-
 function parseModelId(input: string): string {
   const trimmed = input
     .trim()
@@ -41,7 +30,7 @@ function parseModelId(input: string): string {
   return path.split('/').slice(0, 2).join('/')
 }
 
-async function fetchText(url: string, config: ModelInfoConfig, signal: AbortSignal): Promise<string> {
+async function fetchText(url: string, config: Config, signal: AbortSignal): Promise<string> {
   if (!config.hfToken) throw new Error('workload-integration: hfToken is empty')
   const response = await undiciFetch(url, {
     dispatcher: hfAgent,
@@ -59,7 +48,7 @@ async function fetchText(url: string, config: ModelInfoConfig, signal: AbortSign
   return response.text()
 }
 
-export function defineModelInfoTool(config: ModelInfoConfig) {
+export function defineModelInfoTool(config: Config) {
   return defineTool({
     name: 'buckyball_model_info',
     description:
