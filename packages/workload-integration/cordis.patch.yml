@@ -1,6 +1,0 @@
-- insert:
-    - id: tool-workload-integration
-      name: '@dangosys/dsh-workload-integration'
-      config:
-        hfToken: ''
-        hfEndpoint: https://huggingface.co

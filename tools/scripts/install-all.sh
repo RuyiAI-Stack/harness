@@ -41,12 +41,13 @@ pnpm dsh plugin --profile web add "$ROOT/packages/singularity/bundle"
 # ===------------------------------------------------------===#
 # Step 5. Install third-party plugins from npm
 # ===------------------------------------------------------===#
-PROFILE="$ROOT/.dsh/profiles/web"
-set +e
-pnpm dsh plugin --profile web add dsh-better-sidebar@latest
-set -e
-(cd "$PROFILE" && pnpm approve-builds --all)
-pnpm dsh plugin --profile web add dsh-better-sidebar@latest
+# Disabled: dsh-better-sidebar removed from the profile.
+# PROFILE="$ROOT/.dsh/profiles/web"
+# set +e
+# pnpm dsh plugin --profile web add dsh-better-sidebar@latest
+# set -e
+# (cd "$PROFILE" && pnpm approve-builds --all)
+# pnpm dsh plugin --profile web add dsh-better-sidebar@latest
 
 # ===------------------------------------------------------===#
 # Step 6. Apply profile patch after all plugin adds

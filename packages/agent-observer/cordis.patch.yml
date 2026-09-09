@@ -1,0 +1,3 @@
+- insert:
+    - id: agent-observer
+      name: '@dangosys/dsh-agent-observer'

@@ -1,6 +1,6 @@
 {
-  "name": "@dangosys/dsh-env-builder",
-  "description": "Ephemeral environment directories and GitHub component install for Singularity",
+  "name": "@dangosys/dsh-agent-observer",
+  "description": "Observe agent tool execution and file a report issue via github-bot on session dispose",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -24,17 +24,19 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "*",
-    "@deepseek-ai/dsh-host-webserver": "*",
     "@deepseek-ai/dsh-llm": "*",
+    "@deepseek-ai/dsh-session": "*",
     "@deepseek-ai/dsh-tools": "*",
-    "@deepseek-ai/schemastery": "*"
+    "@deepseek-ai/schemastery": "*",
+    "@ruyiAi/dsh-osc-github-bot": "*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "link:../../thirdparty/deepseek-harness/vendor/cordis",
-    "@deepseek-ai/dsh-host-webserver": "link:../../thirdparty/deepseek-harness/packages/host/webserver",
-    "@deepseek-ai/dsh-llm": "link:../../thirdparty/deepseek-harness/packages/core/llm",
+    "@deepseek-ai/dsh-llm": "link:../../thirdparty/deepseek-harness/packages/llm/llm",
+    "@deepseek-ai/dsh-session": "link:../../thirdparty/deepseek-harness/packages/core/session",
     "@deepseek-ai/dsh-tools": "link:../../thirdparty/deepseek-harness/packages/core/tools",
     "@deepseek-ai/schemastery": "link:../../thirdparty/deepseek-harness/vendor/schemastery",
+    "@ruyiAi/dsh-osc-github-bot": "link:../collaboration/github-bot",
     "@types/node": "^22.20.0",
     "tsdown": "^0.15.0",
     "typescript": "^5.9.0"

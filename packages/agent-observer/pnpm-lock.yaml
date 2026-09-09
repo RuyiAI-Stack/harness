@@ -11,18 +11,21 @@ importers:
       '@deepseek-ai/cordis':
         specifier: link:../../thirdparty/deepseek-harness/vendor/cordis
         version: link:../../thirdparty/deepseek-harness/vendor/cordis
-      '@deepseek-ai/dsh-host-webserver':
-        specifier: link:../../thirdparty/deepseek-harness/packages/host/webserver
-        version: link:../../thirdparty/deepseek-harness/packages/host/webserver
       '@deepseek-ai/dsh-llm':
-        specifier: link:../../thirdparty/deepseek-harness/packages/core/llm
-        version: link:../../thirdparty/deepseek-harness/packages/core/llm
+        specifier: link:../../thirdparty/deepseek-harness/packages/llm/llm
+        version: link:../../thirdparty/deepseek-harness/packages/llm/llm
+      '@deepseek-ai/dsh-session':
+        specifier: link:../../thirdparty/deepseek-harness/packages/core/session
+        version: link:../../thirdparty/deepseek-harness/packages/core/session
       '@deepseek-ai/dsh-tools':
         specifier: link:../../thirdparty/deepseek-harness/packages/core/tools
         version: link:../../thirdparty/deepseek-harness/packages/core/tools
       '@deepseek-ai/schemastery':
         specifier: link:../../thirdparty/deepseek-harness/vendor/schemastery
         version: link:../../thirdparty/deepseek-harness/vendor/schemastery
+      '@ruyiAi/dsh-osc-github-bot':
+        specifier: link:../collaboration/github-bot
+        version: link:../collaboration/github-bot
       '@types/node':
         specifier: ^22.20.0
         version: 22.20.1

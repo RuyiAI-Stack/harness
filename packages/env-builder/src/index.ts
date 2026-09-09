@@ -7,7 +7,12 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Context, Service } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ToolExecution, ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import { PATH } from './constants.ts'
+import { failExpPromptText } from './prompts/1.1-fail-exp.prompts.js'
+import { hintsPromptText } from './prompts/0-hints.prompts.js'
+import { verifyPromptText } from './prompts/2-verify.prompts.js'
 import { EnvStore } from './service/store.ts'
 import { defineAttachSessionTool } from './tools/api/attach-session.ts'
 import { defineBindComponentSessionTool } from './tools/api/bind-component-session.ts'
@@ -59,6 +64,36 @@ export default class EnvBuilder extends Service {
     ctx.tools.register(defineSetRunningTool(this.store))
     ctx.tools.register(defineResetTool(this.store))
     ctx.tools.register(defineDeleteTool(this.store))
+
+    ctx.on('tools/result', (exec: ToolExecution, result: ToolExecutionResult) => {
+      if (!exec.agent) return
+
+      // [inject hint prompt] after [git clone success];
+      // [fail-exp1 prompt] after a [git clone failure]
+      if (exec.name === 'bash') {
+        const { command } = exec.arguments as { command: string }
+        if (!/\bgit\s+clone\s+/.test(command)) return
+        exec.agent.inbox.prepend(
+          'next-step',
+          createUserMessage({
+            content: [{ type: 'text', text: result.isError ? failExpPromptText(command) : hintsPromptText() }],
+            source: { kind: 'plugin', plugin: 'env-builder' },
+          }),
+        )
+        return
+      }
+
+      // [inject verify prompt] after [env_register_component]
+      if (exec.name !== 'env_register_component' || result.isError) return
+      const { env, repo } = exec.arguments as { env: string; repo: string }
+      exec.agent.inbox.prepend(
+        'next-step',
+        createUserMessage({
+          content: [{ type: 'text', text: verifyPromptText(env, repo) }],
+          source: { kind: 'plugin', plugin: 'env-builder' },
+        }),
+      )
+    })
 
     ctx.effect(
       () =>
