@@ -13,6 +13,7 @@ import { PATH } from './constants.ts'
 import { failExpPromptText } from './prompts/1.1-fail-exp.prompts.js'
 import { hintsPromptText } from './prompts/0-hints.prompts.js'
 import { verifyPromptText } from './prompts/2-verify.prompts.js'
+import { assertGithubRepo } from './service/github.ts'
 import { EnvStore } from './service/store.ts'
 import { defineAttachSessionTool } from './tools/api/attach-session.ts'
 import { defineBindComponentSessionTool } from './tools/api/bind-component-session.ts'
@@ -34,6 +35,8 @@ import { statusOf, write } from './web/libs/http.ts'
 export { EnvStore } from './service/store.ts'
 export type { ComponentStatus, EnvComponent, EnvManifest, EnvRecord } from './service/types.ts'
 export { HttpError, statusOf } from './web/libs/http.ts'
+export { assertGithubRepo } from './service/github.ts'
+export { parseRepoRef } from './service/parse.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -46,6 +49,10 @@ const ENV_ROOT = join(resolve(dirname(fileURLToPath(import.meta.url)), '../../..
 export default class EnvBuilder extends Service {
   static inject = ['tools', 'webServer']
   readonly store = new EnvStore(ENV_ROOT)
+
+  assertRepo(ref: string) {
+    return assertGithubRepo(ref)
+  }
 
   constructor(ctx: Context) {
     super(ctx, 'envBuilder')

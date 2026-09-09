@@ -187,6 +187,21 @@ export class EnvStore {
     return dir
   }
 
+  /** Record a github component to install later (no clone yet). */
+  planComponent(envId: string, ref: string): void {
+    const parsed = parseRepoRef(ref)
+    const manifest = this.load()
+    const env = manifest.environments.find(e => e.id === envId)
+    if (!env) throw new Error(`env-builder: unknown environment ${envId}`)
+    if (env.components.some(c => c.dir === parsed.dir)) {
+      throw new Error(`env-builder: duplicate component dir ${parsed.dir} in ${envId}`)
+    }
+    const dir = join(env.path, parsed.dir)
+    if (existsSync(dir)) throw new Error(`env-builder: path already exists ${dir}`)
+    env.components.push({ ...parsed, status: 'installing' })
+    this.save(manifest)
+  }
+
   async addComponent(envId: string, ref: string): Promise<string> {
     const parsed = parseRepoRef(ref)
     const manifest = this.load()
@@ -342,5 +357,41 @@ export class EnvStore {
     for (const c of env.components) {
       resetRepo(join(env.path, c.dir))
     }
+  }
+
+  /**
+   * Thorough clean for rebinding: reset every git repo under the env, delete
+   * anything that is not a managed github checkout, and detach all sessions.
+   */
+  clean(envId: string): EnvRecord {
+    const manifest = this.load()
+    const env = manifest.environments.find(e => e.id === envId)
+    if (!env) throw new Error(`env-builder: unknown environment ${envId}`)
+    if (!existsSync(env.path)) throw new Error(`env-builder: environment path missing ${env.path}`)
+
+    const managed = new Set(env.components.map(c => c.dir))
+    for (const entry of readdirSync(env.path, { withFileTypes: true })) {
+      if (entry.name === '.' || entry.name === '..') continue
+      const full = join(env.path, entry.name)
+      if (managed.has(entry.name)) {
+        if (!existsSync(join(full, '.git'))) {
+          throw new Error(`env-builder: managed component ${entry.name} is not a git repo`)
+        }
+        resetRepo(full)
+        continue
+      }
+      rmSync(full, { recursive: true, force: true })
+    }
+    for (const c of env.components) {
+      const full = join(env.path, c.dir)
+      if (!existsSync(full)) throw new Error(`env-builder: component dir missing after clean ${c.dir}`)
+      if (!existsSync(join(full, '.git'))) throw new Error(`env-builder: component lost .git ${c.dir}`)
+      resetRepo(full)
+      delete c.sessionId
+    }
+    env.sessionIds = []
+    env.running = false
+    this.save(manifest)
+    return this.get(envId)
   }
 }

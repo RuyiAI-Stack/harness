@@ -71,6 +71,20 @@ describe('EnvStore', () => {
     expect(store.selectedRepo()).toBeUndefined()
   })
 
+  it('planComponent records installing without clone', () => {
+    const env = store.create()
+    store.planComponent(env.id, 'acme/widget')
+    const got = store.get(env.id).components[0]
+    expect(got).toMatchObject({
+      owner: 'acme',
+      repo: 'widget',
+      dir: 'acme/widget',
+      status: 'installing',
+    })
+    expect(existsSync(join(env.path, 'acme', 'widget'))).toBe(false)
+    expect(() => store.planComponent(env.id, 'acme/widget')).toThrow(/duplicate/)
+  })
+
   it('registerComponent records a cloned repo', () => {
     const bare = join(root, 'bare2.git')
     mkdirSync(bare)
