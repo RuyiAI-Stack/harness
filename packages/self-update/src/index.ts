@@ -43,6 +43,7 @@ export default class SelfUpdate extends Service {
       script: resolve(root, config.script),
       cwd: root,
       logPath: resolve(root, config.logDir, 'self-update.log'),
+      restart: config.restart,
     })
 
     ctx.tools.register(defineStartTool(this.runner, config.enabled !== false))

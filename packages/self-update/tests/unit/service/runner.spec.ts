@@ -26,7 +26,7 @@ function withScript(body: string, fn: (dir: string, script: string, log: string)
 describe('InstallRunner', () => {
   it('runs a successful script and records the log', async () => {
     await withScript('echo hello-from-script', async (dir, script, log) => {
-      const runner = new InstallRunner({ script, cwd: dir, logPath: log })
+      const runner = new InstallRunner({ script, cwd: dir, logPath: log, restart: false })
       const started = runner.start()
       expect(started?.phase).toBe('running')
       expect(started?.pid).toBeTypeOf('number')
@@ -40,7 +40,7 @@ describe('InstallRunner', () => {
 
   it('records a failing script as failed', async () => {
     await withScript('echo boom >&2\nexit 3', async (dir, script, log) => {
-      const runner = new InstallRunner({ script, cwd: dir, logPath: log })
+      const runner = new InstallRunner({ script, cwd: dir, logPath: log, restart: false })
       runner.start()
       const state = await waitFor(runner)
       expect(state.phase).toBe('failed')
@@ -52,7 +52,7 @@ describe('InstallRunner', () => {
 
   it('rejects a second start while running', async () => {
     await withScript('sleep 1', async (dir, script, log) => {
-      const runner = new InstallRunner({ script, cwd: dir, logPath: log })
+      const runner = new InstallRunner({ script, cwd: dir, logPath: log, restart: false })
       runner.start()
       expect(runner.start()).toBeUndefined()
       const state = await waitFor(runner)

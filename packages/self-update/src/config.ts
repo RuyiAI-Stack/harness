@@ -9,6 +9,8 @@ export interface Config {
   logDir: string
   /** Allow running the self-update. Defaults to true. */
   enabled: boolean
+  /** Auto-restart the host after a successful update. Defaults to true. */
+  restart: boolean
 }
 
 export const Config: z<Config> = z.object({
@@ -16,4 +18,5 @@ export const Config: z<Config> = z.object({
   script: z.string().default('tools/scripts/install-all.sh'),
   logDir: z.string().default('.dsh'),
   enabled: z.boolean().default(true),
+  restart: z.boolean().default(true),
 })

@@ -20,6 +20,8 @@ export interface RunnerOptions {
   cwd: string
   /** Absolute path of the log file; truncated at the start of each run. */
   logPath: string
+  /** Relaunch the host after a successful update. */
+  restart: boolean
 }
 
 /**
@@ -103,5 +105,22 @@ export class InstallRunner {
       exitCode: error ? exitCode : 0,
       ...(error ? { error: error.message } : {}),
     }
+    if (!error && this.options.restart) this.maybeRestart()
+  }
+
+  /**
+   * Relaunch the host after a successful update. The restarter is detached so it
+   * survives the host's death, then kills this process and starts a fresh
+   * `./dsh web` with the inherited environment (DEEPSEEK_API_KEY etc.).
+   */
+  private maybeRestart(): void {
+    const pid = process.pid
+    const script = [
+      'sleep 3',
+      `kill ${pid} 2>/dev/null || true`,
+      'sleep 1',
+      `cd ${JSON.stringify(this.options.cwd)} && nohup ./dsh web >> ${JSON.stringify(this.options.logPath)} 2>&1 &`,
+    ].join('; ')
+    spawn('bash', ['-c', script], { detached: true, stdio: 'ignore', env: process.env }).unref()
   }
 }

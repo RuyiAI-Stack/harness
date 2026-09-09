@@ -22,7 +22,7 @@ export function defineStatusTool(runner: InstallRunner) {
       if (state.phase === 'ok') {
         lines.push(
           '',
-          'self-update finished. Restart the web UI (Ctrl-C, then DEEPSEEK_API_KEY=<key> ./dsh web) to load the rebuilt plugins.',
+          'self-update finished. The host restarts automatically to load the rebuilt plugins; this session resumes after the restart.',
         )
       } else if (state.phase === 'failed') {
         lines.push('', 'self-update failed. Inspect the full log before retrying.')

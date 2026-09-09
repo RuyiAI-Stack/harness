@@ -6,7 +6,7 @@ export function defineStartTool(runner: InstallRunner, enabled: boolean) {
   return defineTool({
     name: 'self_update',
     description:
-      'Start a background self-update: run the repository install script (tools/scripts/install-all.sh) to rebuild and re-register plugins, then poll self_update_status and restart the web UI to apply the update.',
+      'Start a background self-update: run the repository install script (tools/scripts/install-all.sh) to rebuild and re-register plugins, then automatically restart the host to apply the update (the session resumes after the restart).',
     parameters: {},
     output: { schema: { type: 'string' }, render: (_args, value) => text(value) },
     execute: async () => {
