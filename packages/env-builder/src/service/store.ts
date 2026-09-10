@@ -360,36 +360,16 @@ export class EnvStore {
   }
 
   /**
-   * Thorough clean for rebinding: reset every git repo under the env, delete
-   * anything that is not a managed github checkout, and detach all sessions.
+   * Certify an environment is rebindable after an agent-driven clean.
+   * Clears session bindings; does not mutate the filesystem.
    */
-  clean(envId: string): EnvRecord {
+  markClean(envId: string): EnvRecord {
     const manifest = this.load()
     const env = manifest.environments.find(e => e.id === envId)
     if (!env) throw new Error(`env-builder: unknown environment ${envId}`)
     if (!existsSync(env.path)) throw new Error(`env-builder: environment path missing ${env.path}`)
-
-    const managed = new Set(env.components.map(c => c.dir))
-    for (const entry of readdirSync(env.path, { withFileTypes: true })) {
-      if (entry.name === '.' || entry.name === '..') continue
-      const full = join(env.path, entry.name)
-      if (managed.has(entry.name)) {
-        if (!existsSync(join(full, '.git'))) {
-          throw new Error(`env-builder: managed component ${entry.name} is not a git repo`)
-        }
-        resetRepo(full)
-        continue
-      }
-      rmSync(full, { recursive: true, force: true })
-    }
-    for (const c of env.components) {
-      const full = join(env.path, c.dir)
-      if (!existsSync(full)) throw new Error(`env-builder: component dir missing after clean ${c.dir}`)
-      if (!existsSync(join(full, '.git'))) throw new Error(`env-builder: component lost .git ${c.dir}`)
-      resetRepo(full)
-      delete c.sessionId
-    }
     env.sessionIds = []
+    for (const c of env.components) delete c.sessionId
     env.running = false
     this.save(manifest)
     return this.get(envId)

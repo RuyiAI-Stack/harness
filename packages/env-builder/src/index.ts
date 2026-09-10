@@ -13,6 +13,7 @@ import { PATH } from './constants.ts'
 import { failExpPromptText } from './prompts/1.1-fail-exp.prompts.js'
 import { hintsPromptText } from './prompts/0-hints.prompts.js'
 import { verifyPromptText } from './prompts/2-verify.prompts.js'
+import { cleanPromptText } from './prompts/3-clean.prompts.js'
 import { assertGithubRepo } from './service/github.ts'
 import { EnvStore } from './service/store.ts'
 import { defineAttachSessionTool } from './tools/api/attach-session.ts'
@@ -21,6 +22,7 @@ import { defineDeleteTool } from './tools/api/delete.ts'
 import { defineDetachSessionTool } from './tools/api/detach-session.ts'
 import { defineEnsureComponentTool } from './tools/api/ensure-component.ts'
 import { defineListTool } from './tools/api/list.ts'
+import { defineMarkCleanTool } from './tools/api/mark-clean.ts'
 import { defineRegisterComponentTool } from './tools/api/register-component.ts'
 import { defineRemoveComponentTool } from './tools/api/remove-component.ts'
 import { defineRenameTool } from './tools/api/rename.ts'
@@ -37,10 +39,14 @@ export type { ComponentStatus, EnvComponent, EnvManifest, EnvRecord } from './se
 export { HttpError, statusOf } from './web/libs/http.ts'
 export { assertGithubRepo } from './service/github.ts'
 export { parseRepoRef } from './service/parse.ts'
+export { cleanPromptText } from './prompts/3-clean.prompts.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
     envBuilder: EnvBuilder
+  }
+  interface Events {
+    'envBuilder/cleaned'(envId: string): void
   }
 }
 
@@ -71,6 +77,7 @@ export default class EnvBuilder extends Service {
     ctx.tools.register(defineSetRunningTool(this.store))
     ctx.tools.register(defineResetTool(this.store))
     ctx.tools.register(defineDeleteTool(this.store))
+    ctx.tools.register(defineMarkCleanTool(ctx, this.store))
 
     ctx.on('tools/result', (exec: ToolExecution, result: ToolExecutionResult) => {
       if (!exec.agent) return
