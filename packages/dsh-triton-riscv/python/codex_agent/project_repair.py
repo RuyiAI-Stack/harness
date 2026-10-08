@@ -1,5 +1,6 @@
 """Review-gated project patch workflow for compiler and build failures."""
 from __future__ import annotations
+from codex_agent.runtime_config import permission_enabled
 import hashlib, json, os, re, subprocess, time, uuid
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -60,7 +61,7 @@ def review_project_patch(repo_root: Path, proposal_id: str, *, approve: bool, re
 def apply_project_patch(repo_root: Path, proposal_id: str) -> dict:
     root=repo_root.resolve(); path=root/'agent-results'/'project-repairs'/f'{proposal_id}.json'; data=json.loads(path.read_text(encoding='utf-8'))
     if data['status']!='approved': return {"proposal_id":proposal_id,"status":"not_approved"}
-    if os.environ.get('TRITON_RISCV_ALLOW_REPAIR_APPLY')!='1': return {"proposal_id":proposal_id,"status":"blocked","message":"set TRITON_RISCV_ALLOW_REPAIR_APPLY=1 to apply reviewed patches"}
+    if not permission_enabled("repair"): return {"proposal_id":proposal_id,"status":"blocked","message":"enable permissions.repair to apply reviewed patches"}
     for name,expected in data['sha256'].items():
         if _sha(root/name)!=expected: raise RuntimeError(f"source changed after proposal: {name}")
     patch=root/'agent-results'/'project-repairs'/f'{proposal_id}.diff'; patch.write_text(data['diff'],encoding='utf-8')

@@ -1,17 +1,18 @@
 import { spawn } from 'node:child_process'
-import { dirname, isAbsolute, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { isAbsolute } from 'node:path'
+import { bridgeEnvironment, configFromEnvironment, resolveConfig } from './config.js'
 
 // This host-only channel is intentionally not registered as an MCP tool.
-export function callBridge(request, { signal, env = process.env, timeoutMs = 30_000 } = {}) {
-  const root = env.TRITON_RISCV_REPO_ROOT || env.TRITON_RISCV_CHECKOUT || env.DSH_CWD
+export function callBridge(request, { signal, config, env = process.env, timeoutMs = 30_000 } = {}) {
+  const settings = config || resolveConfig(configFromEnvironment(env))
+  const root = settings.repoRoot
   if (!root || !isAbsolute(root)) throw new Error('Set an absolute TRITON_RISCV_REPO_ROOT for the native plugin')
-  const python = env.TRITON_RISCV_MCP_PYTHON || resolve(dirname(fileURLToPath(import.meta.url)), '../.venv/bin/python')
+  const python = settings.python
   signal?.throwIfAborted()
   return new Promise((accept, reject) => {
     const child = spawn(python, ['-I', '-m', 'codex_agent.harness.native_bridge'], {
       cwd: root,
-      env: { ...env, TRITON_RISCV_REPO_ROOT: root },
+      env: bridgeEnvironment(settings, env),
       stdio: ['pipe', 'pipe', 'pipe'],
     })
     let output = ''

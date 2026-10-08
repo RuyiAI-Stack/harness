@@ -82,6 +82,64 @@ class OperatorLifecycleTests(unittest.TestCase):
             with self.assertRaisesRegex(PermissionError, "ALLOW_VALIDATION"):
                 validate_operator_target(self.root, "demo", execute=True)
 
+    def test_isolation_failure_never_requests_operator_source_repair(self):
+        run_id = self.failed_receipt()
+        receipt_path = next((self.root / "agent-results/operator-lifecycle/receipts").glob(f"{run_id}.json"))
+        receipt = json.loads(receipt_path.read_text())
+        receipt["failure_stage"] = "isolation"
+        receipt_path.write_text(json.dumps(receipt))
+        diagnosis = diagnose_failure_run(self.root, run_id)
+        self.assertFalse(diagnosis.source_repair_allowed)
+        self.assertIn("do not edit operator source or disable isolation", diagnosis.recommended_action)
+
+    def test_capacity_failure_never_requests_source_repair(self):
+        run_id = self.failed_receipt()
+        path = self.root / f"agent-results/operator-lifecycle/receipts/{run_id}.json"
+        receipt = json.loads(path.read_text())
+        receipt["failure_stage"] = "capacity"
+        path.write_text(json.dumps(receipt))
+        diagnosis = diagnose_failure_run(self.root, run_id)
+        self.assertFalse(diagnosis.source_repair_allowed)
+        self.assertIn("do not edit operator source", diagnosis.recommended_action)
+        self.assertIn("not started", diagnosis.stop_reason)
+
+    def test_capacity_receipt_never_becomes_operator_failure_memory(self):
+        from codex_agent.validation_evidence import ValidationEvidence
+        result = OperatorValidationResult(operator="demo",
+            implementation_file="python/examples/flaggems/demo.py",
+            test_files=["python/examples/flaggems/test_demo.py"], command="fixture",
+            dry_run=False, exit_code=81, status="failed", failure_stage="capacity",
+            likely_reason="no slot", error_excerpt=[], duration_seconds=30, log_path=None)
+        with patch.dict(os.environ, {"TRITON_RISCV_ALLOW_VALIDATION": "1"}, clear=True), \
+             patch("codex_agent.operator_lifecycle.run_operator", return_value=result), \
+             patch("codex_agent.operator_lifecycle.audit_validation_receipt", return_value=
+                   ValidationEvidence(verdict="verified-failed", trusted=True, success=False)), \
+             patch("codex_agent.operator_lifecycle.remember_validation") as remember:
+            output = validate_operator_target(self.root, "demo", execute=True)
+        remember.assert_not_called()
+        self.assertEqual(output.memory_write["status"], "not-recorded")
+
+    def test_cancellation_is_not_a_source_failure_or_failure_memory(self):
+        run_id = self.failed_receipt()
+        path = self.root / f"agent-results/operator-lifecycle/receipts/{run_id}.json"
+        receipt = json.loads(path.read_text())
+        receipt.update(status="cancelled", failure_stage="cancellation", exit_code=130)
+        path.write_text(json.dumps(receipt))
+        diagnosis = diagnose_failure_run(self.root, run_id)
+        self.assertFalse(diagnosis.source_repair_allowed)
+        self.assertIn("cancelled", diagnosis.stop_reason)
+        result = OperatorValidationResult(operator="demo",
+            implementation_file="python/examples/flaggems/demo.py",
+            test_files=["python/examples/flaggems/test_demo.py"], command="fixture",
+            dry_run=False, exit_code=130, status="cancelled", failure_stage="cancellation",
+            likely_reason="host cancelled", error_excerpt=[], duration_seconds=1, log_path=None)
+        with patch.dict(os.environ, {"TRITON_RISCV_ALLOW_VALIDATION": "1"}, clear=True), \
+             patch("codex_agent.operator_lifecycle.run_operator", return_value=result), \
+             patch("codex_agent.operator_lifecycle.remember_validation") as remember:
+            output = validate_operator_target(self.root, "demo", execute=True)
+        remember.assert_not_called()
+        self.assertEqual(output.memory_write["status"], "not-recorded")
+
     def test_live_validation_uses_host_configured_remote_executor(self) -> None:
         remote_result = OperatorValidationResult(
             operator="demo",
@@ -121,6 +179,21 @@ class OperatorLifecycleTests(unittest.TestCase):
         self.assertEqual(result.status, "passed")
         self.assertEqual(result.execution_target, "remote")
         self.assertEqual(result.remote_preflight.architecture, "riscv64")
+
+    def test_risky_candidate_is_blocked_before_local_or_remote_execution(self) -> None:
+        self.implementation.write_text(ORIGINAL_SOURCE + '\nimport os\nos.system("true")\n')
+        with patch.dict(os.environ, {"TRITON_RISCV_ALLOW_VALIDATION": "1"}, clear=True), patch(
+            "codex_agent.operator_lifecycle.run_operator"
+        ) as local, patch("codex_agent.operator_lifecycle.run_remote_operator") as remote:
+            with self.assertRaisesRegex(ValueError, "risk screening"):
+                validate_operator_target(self.root, "demo", execute=True)
+        local.assert_not_called()
+        remote.assert_not_called()
+
+    def test_risky_repair_is_not_stored_as_a_proposal(self) -> None:
+        run_id = self.failed_receipt()
+        with self.assertRaisesRegex(ValueError, "risk screening"):
+            propose_operator_repair(self.root, run_id, REPLACEMENT_SOURCE + '\nimport socket\n', "fixture")
 
     def test_remote_plan_displays_the_command_that_will_run(self) -> None:
         environment = {

@@ -37,8 +37,9 @@ class ProjectToolsTests(unittest.TestCase):
             result = jobs.execute_validation_job(self.root, job["job_id"])
             self.assertEqual(result["status"], "passed", result)
             self.assertTrue(Path(result["results"][0]["log_path"]).is_file())
-            with self.assertRaises(PermissionError):
-                jobs.execute_validation_job(self.root, job["job_id"])
+            with patch("codex_agent.project_tools.run_target") as runner:
+                self.assertEqual(jobs.execute_validation_job(self.root, job["job_id"]), result)
+                runner.assert_not_called()
 
     def test_source_change_is_rejected_before_execution(self):
         with patch.dict(os.environ, {"TRITON_RISCV_REQUIRE_REMOTE": "0", "TRITON_RISCV_ALLOW_VALIDATION": "1"}):

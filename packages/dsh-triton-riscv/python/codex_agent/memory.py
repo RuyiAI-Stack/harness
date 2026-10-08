@@ -1179,7 +1179,8 @@ def render_memory_context(memories: list[dict], max_chars: int = 6000, *, query_
     from codex_agent.memory_view import render_evidence_context
     if max_chars < 0:
         raise ValueError("max_chars must be nonnegative")
-    selected_format = context_format or os.environ.get("TRITON_RISCV_MEMORY_CONTEXT_FORMAT", "classic")
+    from codex_agent.runtime_config import runtime_config
+    selected_format = context_format or runtime_config().memory.contextFormat
     if selected_format not in {"classic", "compact"}:
         raise ValueError("memory context format must be classic or compact")
     if any((item.get("evidence") or {}).get("chain") for item in memories if isinstance(item.get("evidence"), dict)) or any("evidence_chain" in item for item in memories):

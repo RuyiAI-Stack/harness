@@ -70,6 +70,7 @@ class McpOperatorToolTests(unittest.IsolatedAsyncioTestCase):
             {
                 "check_validation_environment",
                 "discover_operator",
+                "read_operator_file",
                 "validate_operator",
                 "diagnose_failure",
                 "propose_repair",
@@ -85,6 +86,7 @@ class McpOperatorToolTests(unittest.IsolatedAsyncioTestCase):
                 "prepare_validation_job",
                 "execute_validation_job",
                 "get_validation_job",
+                "get_validation_status",
                 "evaluate_plugin_fixtures",
             },
         )
@@ -96,6 +98,32 @@ class McpOperatorToolTests(unittest.IsolatedAsyncioTestCase):
             result.structured_content["operator"]["name"],
             "relu_and_mul",
         )
+
+    async def test_mcp_reads_source_without_execution(self) -> None:
+        with patch.dict(os.environ, {"TRITON_RISCV_REPO_ROOT": str(FIXTURE_REPOSITORY)}):
+            async with Client(server) as client:
+                result = await client.call_tool("read_operator_file", {
+                    "path": "python/examples/flaggems/relu_and_mul.py", "max_lines": 2,
+                })
+        self.assertFalse(result.is_error)
+        self.assertEqual(result.structured_content["next_line"], 3)
+        self.assertEqual(len(result.structured_content["sha256"]), 64)
+
+    async def test_status_tool_is_read_only_and_cannot_override_the_host(self):
+        with patch("codex_agent.remote_maintenance.validation_status", return_value={
+            "run_id": "run-plan", "execution_state": "unknown", "test_status": None,
+            "remote_state": "queued", "observation": "live-remote",
+        }) as inspect:
+            async with Client(server) as client:
+                tools = await client.list_tools()
+                tool = next(item for item in tools.tools if item.name == "get_validation_status")
+                result = await client.call_tool("get_validation_status", {"run_id": "run-plan", "remote": True})
+        self.assertTrue(tool.annotations.read_only_hint)
+        self.assertFalse(tool.annotations.destructive_hint)
+        self.assertEqual(set(tool.input_schema["properties"]), {"run_id", "remote"})
+        self.assertFalse(result.is_error)
+        self.assertIsNone(result.structured_content["test_status"])
+        self.assertEqual(inspect.call_args.kwargs, {"remote": True})
 
     async def test_mcp_validation_defaults_to_a_nonexecuting_plan(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

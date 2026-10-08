@@ -1,14 +1,16 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync, mkdirSync, renameSync, rmSync, realpathSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
+import { configFromEnvironment, resolveConfig } from './config.js'
 
 // Domain state lives beside (not inside) the host's versioned conversation log.
 // The host refuses unknown event types on restore; never extend its core log ad hoc.
-export function createStateStore(env = process.env) {
-  const configured = env.TRITON_RISCV_REPO_ROOT || env.TRITON_RISCV_CHECKOUT || env.DSH_CWD
+export function createStateStore(input = process.env) {
+  const config = Object.hasOwn(input, 'repoRoot') ? input : resolveConfig(configFromEnvironment(input))
+  const configured = config.repoRoot
   if (!configured || !isAbsolute(configured)) throw new Error('Set an absolute TRITON_RISCV_REPO_ROOT')
   const root = realpathSync(configured)
-  const directory = join(resolve(root, env.TRITON_RISCV_STATE_DIR || 'agent-results'), 'native-harness')
+  const directory = join(resolve(root, config.stateDir || 'agent-results'), 'native-harness')
   const path = id => join(directory, createHash('sha256').update(`${root}\0${id}`).digest('hex') + '.json')
   return {
     load(id) {

@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from difflib import get_close_matches
-from pathlib import Path
+import hashlib
+import os
+from pathlib import Path, PurePosixPath
+import stat
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -14,6 +17,65 @@ from codex_agent.discover_operators import (
     discover_operator,
     is_valid_operator_name,
 )
+
+
+class OperatorFileResult(BaseModel):
+    path: str
+    sha256: str
+    start_line: int
+    end_line: int
+    total_lines: int
+    next_line: int | None
+    content: str
+
+
+def read_operator_file(repo_root: Path, path: str, start_line: int = 1,
+                       max_lines: int = 200) -> OperatorFileResult:
+    """Bounded source access without executing code or following symlinks."""
+    relative = PurePosixPath(path)
+    parts = path.split("/")
+    if (relative.is_absolute() or any(p in {"", ".", ".."} for p in parts)
+            or "\\" in path or "\x00" in path):
+        raise ValueError("path must be a normalized repository-relative path")
+    if not ((relative.parent == PurePosixPath(OPERATOR_ROOT) and relative.suffix == ".py")
+            or (relative.parent == PurePosixPath("tasks/operators") and relative.suffix == ".md")):
+        raise ValueError("Only FlagGems source/tests and tasks/operators Markdown are readable")
+    if (type(start_line) is not int or start_line < 1
+            or type(max_lines) is not int or not 1 <= max_lines <= 400):
+        raise ValueError("start_line must be positive; max_lines must be in 1..400")
+    # Traverse with directory descriptors to avoid check-then-open symlink races.
+    directory = os.open(repo_root.resolve(), os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        for part in parts[:-1]:
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+            os.close(directory)
+            directory = child
+        descriptor = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+        with os.fdopen(descriptor, "rb") as source:
+            info = os.fstat(source.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size > 1024 * 1024:
+                raise ValueError("Source must be a regular file no larger than 1 MiB")
+            data = source.read(1024 * 1024 + 1)
+    finally:
+        os.close(directory)
+    if len(data) > 1024 * 1024 or b"\x00" in data:
+        raise ValueError("Source exceeds the size limit or contains binary data")
+    lines = data.decode("utf-8").splitlines(keepends=True)
+    if start_line > len(lines) + 1:
+        raise ValueError("start_line is past the end of the file")
+    selected, size = [], 0
+    for line in lines[start_line - 1:start_line - 1 + max_lines]:
+        length = len(line.encode("utf-8"))
+        if size + length > 32768:
+            if not selected:
+                raise ValueError("A single source line exceeds the 32 KiB output budget")
+            break
+        selected.append(line)
+        size += length
+    end = start_line + len(selected) - 1
+    return OperatorFileResult(path=path, sha256=hashlib.sha256(data).hexdigest(),
+        start_line=start_line, end_line=end, total_lines=len(lines),
+        next_line=end + 1 if end < len(lines) else None, content="".join(selected))
 
 
 class OperatorEvidence(BaseModel):

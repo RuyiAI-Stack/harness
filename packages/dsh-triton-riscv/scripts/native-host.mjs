@@ -1,41 +1,12 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, resolve, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { configFromEnvironment, resolveConfig } from '../lib/config.js'
+import { loadLocalEnvironment } from './local-environment.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const settingsPath = join(root, '.state/native-local.json')
-const local = existsSync(settingsPath) ? JSON.parse(readFileSync(settingsPath, 'utf8')) : {}
-const allowed = [
-  'DSH_NATIVE_SOURCE',
-  'DSH_HOME',
-  'DSH_MODEL',
-  'DSH_PROVIDER',
-  'ISRC_BASE_URL',
-  'TRITON_RISCV_REPO_ROOT',
-  'TRITON_RISCV_STATE_DIR',
-  'TRITON_RISCV_MEMORY_DB',
-  'TRITON_RISCV_MCP_PYTHON',
-  'TRITON_RISCV_NATIVE_PORT',
-  'TRITON_RISCV_KEYCHAIN_SERVICE',
-  'TRITON_RISCV_BROWSER_DIRECTORY_PICKER',
-  'TRITON_RISCV_MEMORY_RETRIEVAL_MODE',
-  'TRITON_RISCV_MEMORY_CONTEXT_FORMAT',
-  'TRITON_RISCV_EMBEDDING_PROVIDER',
-  'RISCV_HOST',
-  'RISCV_REPO',
-  'TRITON_RISCV_ALLOW_VALIDATION',
-  'TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY',
-  'TRITON_RISCV_ALLOW_REPAIR_APPLY',
-  'TRITON_RISCV_REQUIRE_REMOTE',
-  'TRITON_RISCV_REQUIRE_APPROVED_VALIDATION',
-]
-const env = { ...process.env }
-for (const [key, value] of Object.entries(local)) {
-  if (!allowed.includes(key) || typeof value !== 'string') throw new Error('Invalid local configuration key: ' + key)
-  if (env[key] === undefined) env[key] = value
-}
+const env = loadLocalEnvironment(root)
 const candidates = [
   env.DSH_NATIVE_SOURCE,
   resolve(root, '../../thirdparty/deepseek-harness'),

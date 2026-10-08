@@ -1,15 +1,20 @@
 import { spawn } from 'node:child_process'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { resolveWorkbenchLaunch } from '../index.js'
+import { loadLocalEnvironment } from './local-environment.mjs'
 
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const env = loadLocalEnvironment(root)
 const launch = resolveWorkbenchLaunch({
   enabled: true,
-  repoRoot: process.env.TRITON_RISCV_REPO_ROOT || process.env.TRITON_RISCV_CHECKOUT,
-  python: process.env.TRITON_RISCV_MCP_PYTHON,
-  port: Number(process.env.TRITON_RISCV_WORKBENCH_PORT || 8765),
+  repoRoot: env.TRITON_RISCV_REPO_ROOT || env.TRITON_RISCV_CHECKOUT,
+  python: env.TRITON_RISCV_MCP_PYTHON,
+  port: Number(env.TRITON_RISCV_WORKBENCH_PORT || 8765),
 })
 const child = spawn(launch.command, launch.args, {
   cwd: launch.cwd,
-  env: process.env,
+  env,
   stdio: 'inherit',
 })
 child.on('error', error => {

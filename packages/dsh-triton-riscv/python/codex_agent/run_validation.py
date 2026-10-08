@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import subprocess
+from codex_agent.process_control import run_bounded, validation_environment
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -90,9 +91,10 @@ def run_target(
         log_path = log_dir / f"{timestamp}-{slugify(target['path'])}.log"
 
         try:
-            completed = subprocess.run(
+            completed = run_bounded(
                 ["bash", "-lc", command],
                 cwd=repo_root,
+                env=validation_environment(),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,

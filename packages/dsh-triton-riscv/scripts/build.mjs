@@ -17,8 +17,10 @@ cpSync(join(root, 'prompts'), join(bundle, 'prompts'), { recursive: true })
 for (const name of [
   'client.js',
   'native-adapter.js',
+  'tool-policy.js',
   'native-bridge.js',
   'native-state.js',
+  'native-workspace.js',
   'config.js',
   'prompts.js',
 ]) {

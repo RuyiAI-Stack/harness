@@ -1,6 +1,9 @@
 """Guarded new-operator development lifecycle for model-facing tools."""
 
 from __future__ import annotations
+from codex_agent.runtime_config import permission_enabled
+
+from codex_agent.execution_guard import atomic_json, approval_digest, begin_effects, guarded_execution, locked_decision
 
 import ast
 import hashlib
@@ -114,6 +117,7 @@ class ApplyDevelopmentResult(BaseModel):
     created_files: list[str] = Field(default_factory=list)
     message: str
     patch_path: str | None = None
+    followup_plan: dict[str, Any] | None = None
 
 
 def _safe_id(value: str, label: str) -> str:
@@ -134,10 +138,7 @@ def _artifact_dir(repo_root: Path, name: str) -> Path:
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    atomic_json(path, payload)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -172,6 +173,8 @@ def _validate_source(source: str, *, implementation: bool) -> None:
         raise ValueError(f"{label} source is not valid Python: {error}") from error
     if implementation and "@triton.jit" not in source:
         raise ValueError("implementation must contain at least one @triton.jit kernel")
+    from codex_agent.source_risk import assert_source_screened
+    assert_source_screened(source, label)
 
 
 def _request_path(repo_root: Path, development_id: str) -> Path:
@@ -384,6 +387,7 @@ def get_operator_development_proposal(repo_root: Path, proposal_id: str) -> dict
     return {key: value for key, value in proposal.items() if key not in hidden}
 
 
+@locked_decision("development")
 def decide_operator_development_proposal(
     repo_root: Path,
     proposal_id: str,
@@ -405,6 +409,7 @@ def decide_operator_development_proposal(
         "note": note.strip(),
         "decided_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
     }
+    proposal["approval_digest"] = approval_digest(repo_root, "development", proposal)
     _write_json(path, proposal)
     request_path, request = _load_request(repo_root.resolve(), proposal["development_id"])
     request["status"] = proposal["status"]
@@ -449,6 +454,7 @@ def _write_files_atomically(files: dict[Path, str]) -> None:
             temporary_path.unlink(missing_ok=True)
 
 
+@guarded_execution("development", "proposal_id")
 def apply_operator_implementation(
     repo_root: Path,
     proposal_id: str,
@@ -486,14 +492,14 @@ def apply_operator_implementation(
             status="not_approved",
             message="The development proposal must be approved by the host first.",
         )
-    if os.environ.get("TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY") != "1":
+    if not permission_enabled("development"):
         return ApplyDevelopmentResult(
             proposal_id=proposal_id,
             development_id=proposal["development_id"],
             operator=proposal["operator"],
             status="blocked",
             message=(
-                "The host has not enabled TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY=1."
+                "The host has not enabled permissions.development."
             ),
         )
 
@@ -514,6 +520,7 @@ def apply_operator_implementation(
     }
     patch_path = _artifact_dir(root, "patches") / f"{proposal_id}.diff"
     patch_path.write_text(proposal["diff"], encoding="utf-8")
+    begin_effects()
     _write_files_atomically(files)
 
     proposal["status"] = "applied"

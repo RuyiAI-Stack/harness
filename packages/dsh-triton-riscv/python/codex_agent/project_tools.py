@@ -1,5 +1,6 @@
 """Native, reviewable batch/project validation over existing discovery and runners."""
 from __future__ import annotations
+from codex_agent.runtime_config import permission_enabled, runtime_config
 
 from contextlib import contextmanager
 from dataclasses import asdict
@@ -10,6 +11,7 @@ import os
 from pathlib import Path
 import shlex
 import sys
+import time
 from typing import Literal
 
 from codex_agent import operator_lifecycle as lifecycle
@@ -17,6 +19,9 @@ from codex_agent.discover import discover
 from codex_agent.discover_operators import discover_operators
 from codex_agent.failure_diagnosis import diagnose_log
 from codex_agent.run_validation import run_target
+from codex_agent.execution_guard import atomic_json, approval_digest, begin_effects, guarded_execution, inspect_execution, locked_decision
+from codex_agent import batch_recovery
+from codex_agent.process_control import ExecutionCancelled, execution_budget
 
 
 def inspect_project(root: Path, *, kind: str = "operator", offset: int = 0,
@@ -48,11 +53,29 @@ def load_job(root: Path, job_id: str) -> dict:
     return lifecycle._read_json(_path(root, job_id))
 
 
+def get_validation_job(root: Path, job_id: str) -> dict:
+    """Read persisted progress, never dispatch or infer a test pass from a cursor."""
+    job = load_job(root, job_id)
+    if not batch_recovery.enabled(job):
+        return job
+    journal = inspect_execution(root, "job", job_id)
+    recovery = {"supported": True, "observation": "local-record-only",
+                "execution_state": journal["state"] if journal else "not-started",
+                "same_job_id": job_id}
+    if journal:
+        recovery["checkpoint"] = journal.get("execution", {}).get("batch_progress")
+        if journal["state"] in {"running", "unknown"}:
+            try:
+                batch_recovery.validate_recovery(root, job, journal)
+                check_job_sources(root, job)
+                recovery["next_action"] = "resume-same-job; executor still checks locks, arguments and host environment"
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                recovery.update(next_action="host-inspection-required", reason=str(error))
+    return {**job, "recovery": recovery}
+
+
 def _save(root: Path, job: dict) -> None:
-    path = _path(root, job["job_id"])
-    temp = path.with_suffix(".tmp")
-    temp.write_text(json.dumps(job, ensure_ascii=False, indent=2), encoding="utf-8")
-    temp.replace(path)
+    atomic_json(_path(root, job["job_id"]), job)
 
 
 @contextmanager
@@ -114,9 +137,10 @@ def prepare_validation_job(root: Path, targets: list[str], *,
             plan = lifecycle.validate_operator_target(root, name, source_env=source_env,
                                                        timeout_seconds=timeout_seconds)
             items.append({"id": name, "plan": plan.model_dump(mode="json"),
+                          "plan_digest": approval_digest(root, "validation", lifecycle._load_receipt(root, plan.run_id)),
                           "snapshot": lifecycle._load_receipt(root, plan.run_id)["source_snapshot"]})
     else:
-        if os.environ.get("TRITON_RISCV_REQUIRE_REMOTE") == "1":
+        if runtime_config().remote.required:
             raise PermissionError("Project checks are local to the host; use operator-batch for guarded SSH validation, or run the host on RISC-V")
         inventory = {item["id"]: item for item in discover(root)["targets"]}
         for identifier in targets:
@@ -133,6 +157,8 @@ def prepare_validation_job(root: Path, targets: list[str], *,
            "approval": {"status": "pending_approval"}, "source_env": source_env,
            "timeout_seconds": timeout_seconds, "items": items, "results": [],
            "next_action": "Call execute_validation_job to request native approval for these exact commands."}
+    if kind == "operator-batch" and all(item["plan"]["execution_target"] == "remote" for item in items):
+        job["batch_recovery_version"] = batch_recovery.VERSION
     _save(root, job)
     return {**job, "receipt_path": str(_path(root, job["job_id"]))}
 
@@ -148,6 +174,7 @@ def check_job_sources(root: Path, job: dict) -> None:
             raise PermissionError(f"source changed after planning: {item['id']}; create a new job")
 
 
+@locked_decision("job")
 def decide_validation_job(root: Path, job_id: str, *, approve: bool,
                           reviewer: str, note: str = "") -> dict:
     with _lock(root, job_id):
@@ -156,20 +183,25 @@ def decide_validation_job(root: Path, job_id: str, *, approve: bool,
             raise PermissionError("job already decided or consumed")
         check_job_sources(root, job)
         job["approval"] = {"status": "approved" if approve else "rejected", "reviewer": reviewer, "note": note}
+        job["approval_digest"] = approval_digest(root, "job", job)
         _save(root, job)
         return {"job_id": job_id, "status": job["approval"]["status"]}
 
 
+@guarded_execution("job", "job_id")
 def execute_validation_job(root: Path, job_id: str) -> dict:
-    if os.environ.get("TRITON_RISCV_ALLOW_VALIDATION") != "1":
+    if not permission_enabled("validation"):
         raise PermissionError("host must enable TRITON_RISCV_ALLOW_VALIDATION=1")
     with _lock(root, job_id):
         job = load_job(root, job_id)
+        if batch_recovery.enabled(job):
+            return _execute_remote_batch(root, job)
         if job["status"] != "planned" or job["approval"]["status"] != "approved":
             raise PermissionError("job is unapproved, running or consumed; inspect results before creating a new job")
         check_job_sources(root, job)
-        if job["kind"] == "project" and os.environ.get("TRITON_RISCV_REQUIRE_REMOTE") == "1":
+        if job["kind"] == "project" and runtime_config().remote.required:
             raise PermissionError("remote-only host cannot execute local project checks")
+        begin_effects()
         job["status"] = "running"
         _save(root, job)
         try:
@@ -201,9 +233,49 @@ def execute_validation_job(root: Path, job_id: str) -> dict:
             job["status"] = "interrupted"
             _save(root, job)
             raise
-        job["next_action"] = "Inspect per-target receipts; a failure is not automatically a repaired result. Do not replay consumed jobs."
+        job["next_action"] = "Inspect per-target receipts; a failure is not automatically a repaired result. Repeated calls return this committed outcome without rerunning tests."
         _save(root, job)
         return {**job, "receipt_path": str(_path(root, job_id))}
+
+
+def _execute_remote_batch(root: Path, job: dict) -> dict:
+    """Called under the parent guard/locks. Resume children, never replace them."""
+    if job["approval"]["status"] != "approved":
+        raise PermissionError("batch must be approved")
+    check_job_sources(root, job)
+    checkpoint = batch_recovery.initialize(root, job)
+    begin_effects()
+    job.update(status="running", results=[])
+    _save(root, job)
+    try:
+        with execution_budget(checkpoint["deadline_at"] - time.time()):
+            for index, item in enumerate(job["items"]):
+                check_job_sources(root, {**job, "items": [item]})
+                plan = batch_recovery.check_plan(root, job, item)
+                if checkpoint["items"][index]["phase"] == "pending":
+                    # Intent is durable before child approval/dispatch. An absent
+                    # child journal after this point stays unknown, never reruns.
+                    batch_recovery.mark(index, "active")
+                    lifecycle.decide_validation_plan(root, plan["run_id"], approve=True,
+                        reviewer=job["approval"]["reviewer"], note=f"Approved as part of {job['job_id']}")
+                result = lifecycle.validate_operator_target(root, item["id"], execute=True,
+                    approved_run_id=plan["run_id"], source_env=job["source_env"],
+                    timeout_seconds=job["timeout_seconds"]).model_dump(mode="json")
+                # The child guard has committed receipt/log hashes before this.
+                batch_recovery.mark(index, "completed", result)
+                job["results"].append({"id": item["id"], **result})
+                _save(root, job)
+                if result.get("status") == "cancelled" or result.get("failure_stage") == "cancellation":
+                    raise ExecutionCancelled("Batch child was cancelled; inspect evidence before continuing")
+    except BaseException:
+        job.update(status="interrupted", next_action=
+            "Batch paused: preserve this job ID. Resume execute_validation_job with the SAME ID; unknown outcomes are not test failures. Cancelled, expired or inconsistent jobs require host inspection.")
+        _save(root, job)
+        raise
+    job["status"] = "passed" if all(item["status"] == "passed" for item in job["results"]) else "failed"
+    job["next_action"] = "All child receipts are committed. Repeated calls replay this outcome, not the tests."
+    _save(root, job)
+    return {**job, "receipt_path": str(_path(root, job["job_id"]))}
 
 
 def evaluate_plugin() -> dict:

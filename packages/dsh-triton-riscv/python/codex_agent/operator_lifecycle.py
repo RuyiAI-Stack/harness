@@ -1,6 +1,9 @@
 """Guarded operator validation, diagnosis, and repair lifecycle tools."""
 
 from __future__ import annotations
+from codex_agent.runtime_config import approval_required, permission_enabled, runtime_config
+
+from codex_agent.execution_guard import atomic_json, approval_digest, begin_effects, guarded_execution, locked_decision
 
 import ast
 import hashlib
@@ -66,6 +69,7 @@ class ValidationToolResult(BaseModel):
     receipt_path: str
     evidence: ValidationEvidence
     memory_write: dict[str, Any] = Field(default_factory=dict)
+    isolation: dict[str, Any] = Field(default_factory=dict)
 
 
 class DiagnosisToolResult(BaseModel):
@@ -117,6 +121,7 @@ class ApplyRepairResult(BaseModel):
     implementation_file: str
     message: str
     patch_path: str | None = None
+    followup_plan: dict[str, Any] | None = None
 
 
 def _safe_id(value: str, label: str) -> str:
@@ -132,7 +137,7 @@ def _artifact_dir(repo_root: Path, name: str) -> Path:
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_json(path, payload)
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -167,6 +172,8 @@ def _validate_replacement_source(source: str) -> None:
     ast.parse(source)
     if "@triton.jit" not in source:
         raise ValueError("replacement must retain at least one @triton.jit kernel")
+    from codex_agent.source_risk import assert_source_screened
+    assert_source_screened(source, "replacement_source")
 
 
 def _load_receipt(repo_root: Path, run_id: str) -> dict[str, Any]:
@@ -212,6 +219,7 @@ def _repair_attempts(repo_root: Path, operator: str) -> int:
     return attempts
 
 
+@guarded_execution("validation", "approved_run_id")
 def validate_operator_target(
     repo_root: Path,
     operator_name: str,
@@ -229,10 +237,12 @@ def validate_operator_target(
         raise ValueError(evidence.message)
     if timeout_seconds < 1 or timeout_seconds > 3600:
         raise ValueError("timeout_seconds must be between 1 and 3600")
-    if execute and os.environ.get("TRITON_RISCV_ALLOW_VALIDATION") != "1":
+    if approval_required() and timeout_seconds > 900:
+        raise ValueError("Harness validation timeout must not exceed the 900 second total budget")
+    if execute and not permission_enabled("validation"):
         raise PermissionError(
             "live validation is disabled; the host must set "
-            "TRITON_RISCV_ALLOW_VALIDATION=1"
+            "permissions.validation=true (legacy: TRITON_RISCV_ALLOW_VALIDATION=1)"
         )
 
     operator = evidence.operator.model_dump()
@@ -242,9 +252,7 @@ def validate_operator_target(
         operator["test_files"],
     )
     approved_plan: dict[str, Any] | None = None
-    require_approval = os.environ.get(
-        "TRITON_RISCV_REQUIRE_APPROVED_VALIDATION", "0"
-    ) == "1"
+    require_approval = approval_required()
     if execute and (require_approval or approved_run_id is not None):
         if not approved_run_id:
             raise PermissionError(
@@ -264,14 +272,19 @@ def validate_operator_target(
     remote = RemoteValidationConfig.from_env()
     if (
         execute
-        and os.environ.get("TRITON_RISCV_REQUIRE_REMOTE") == "1"
+        and runtime_config().remote.required
         and remote is None
     ):
         raise PermissionError(
-            "remote validation is required; configure RISCV_HOST and RISCV_REPO"
+            "remote validation is required; configure remote.host and remote.repository"
         )
 
-    run_id = _new_id("run")
+    from codex_agent.execution_guard import execution_details, execution_kind, record_execution_detail
+    recoverable_operation = execute and execution_kind() == "validation"
+    run_id = execution_details().get("validation_result_run_id") if recoverable_operation else None
+    run_id = run_id or _new_id("run")
+    if recoverable_operation:
+        record_execution_detail(validation_result_run_id=run_id)
     validation_run_id = (approved_plan or {}).get("validation_run_id") or run_id
     if execute and approved_plan is not None:
         if (
@@ -306,6 +319,10 @@ def validate_operator_target(
             )
 
     preflight: RemotePreflightResult | None = None
+    if execute:
+        from codex_agent.source_risk import screen_operator_files
+        screen_operator_files(root, [operator["implementation_file"], *operator["test_files"]])
+        begin_effects()
     if execute and remote is not None:
         result, preflight = run_remote_operator(
             operator,
@@ -382,7 +399,7 @@ def validate_operator_target(
     # Only executed, audited outcomes become historical evidence.
     payload["memory_write"] = (
         remember_validation(root, payload, operator)
-        if execute and validation_evidence.verdict in {"verified-passed", "verified-failed"}
+        if execute and result.failure_stage not in {"capacity", "cancellation"} and validation_evidence.verdict in {"verified-passed", "verified-failed"}
         else {"status": "not-recorded", "reason": "no verified execution"}
     )
     _write_json(receipt_path, payload)
@@ -403,6 +420,7 @@ def validate_operator_target(
         receipt_path=receipt_path.relative_to(root).as_posix(),
         evidence=validation_evidence,
         memory_write=payload["memory_write"],
+        isolation=result.isolation,
     )
 
 
@@ -427,6 +445,7 @@ def get_validation_plan(repo_root: Path, run_id: str) -> dict[str, Any]:
     }
 
 
+@locked_decision("validation")
 def decide_validation_plan(
     repo_root: Path,
     run_id: str,
@@ -453,6 +472,7 @@ def decide_validation_plan(
         "decided_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
     }
     path = _artifact_dir(root, "receipts") / f"{run_id}.json"
+    receipt["approval_digest"] = approval_digest(root, "validation", receipt)
     _write_json(path, receipt)
     return get_validation_plan(root, run_id)
 
@@ -503,6 +523,17 @@ def diagnose_failure_run(repo_root: Path, run_id: str) -> DiagnosisToolResult:
             "Provide the latest receipt, full log, generated patch history, and validation "
             "command to the Triton-RISCV compiler owner."
         )
+    elif stage == "isolation":
+        action = "Repair the sandbox setup; do not edit operator source or disable isolation."
+        stop_reason = "required execution isolation could not be established"
+        user_action = "Inspect the sandbox error and host runtime mounts/capabilities; no unrestricted retry is allowed."
+    elif stage == "cancellation":
+        action = "Preserve the host cancellation evidence; do not repair operator source."
+        stop_reason = "validation cancelled, not an operator correctness failure"
+    elif stage == "capacity":
+        action = "Check busy or fenced server slots; do not edit operator source or bypass admission."
+        stop_reason = "server capacity unavailable; operator test was not started"
+        user_action = "Wait for running validations, or ask the host operator to inspect an unknown task before releasing its slot."
     elif stage in {"environment", "import", "build", "timeout"}:
         action = "Repair the environment or retry policy; do not change operator source."
         stop_reason = f"{stage or 'environment'} failure is outside operator source"
@@ -626,6 +657,7 @@ def get_repair_proposal(repo_root: Path, proposal_id: str) -> dict[str, Any]:
     }
 
 
+@locked_decision("repair")
 def decide_repair_proposal(
     repo_root: Path,
     proposal_id: str,
@@ -647,10 +679,12 @@ def decide_repair_proposal(
         "note": note.strip(),
         "decided_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
     }
+    proposal["approval_digest"] = approval_digest(repo_root, "repair", proposal)
     _write_json(path, proposal)
     return get_repair_proposal(repo_root, proposal_id)
 
 
+@guarded_execution("repair", "proposal_id")
 def apply_operator_repair(repo_root: Path, proposal_id: str) -> ApplyRepairResult:
     """Apply an approved proposal after source and acceptance-test integrity checks."""
 
@@ -667,13 +701,13 @@ def apply_operator_repair(repo_root: Path, proposal_id: str) -> ApplyRepairResul
             implementation_file=relative_implementation,
             message="The proposal must be approved by the host before it can be applied.",
         )
-    if os.environ.get("TRITON_RISCV_ALLOW_REPAIR_APPLY") != "1":
+    if not permission_enabled("repair"):
         return ApplyRepairResult(
             proposal_id=proposal_id,
             operator=proposal["operator"],
             status="blocked",
             implementation_file=relative_implementation,
-            message="The host has not enabled TRITON_RISCV_ALLOW_REPAIR_APPLY=1.",
+            message="The host has not enabled permissions.repair.",
         )
     if _sha256(implementation) != proposal["source_sha256"]:
         raise RuntimeError("implementation changed after the proposal was created")
@@ -688,6 +722,7 @@ def apply_operator_repair(repo_root: Path, proposal_id: str) -> ApplyRepairResul
     patch_path.write_text(proposal["diff"], encoding="utf-8")
 
     temporary_name: str | None = None
+    begin_effects()
     try:
         with tempfile.NamedTemporaryFile(
             mode="w",

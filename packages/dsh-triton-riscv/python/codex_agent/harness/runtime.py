@@ -63,6 +63,7 @@ class DeepSeekHarnessBackend:
             "TRITON_RISCV_REPO_ROOT": str(self.settings.repo_root),
             "TRITON_RISCV_WORKBENCH_AUTOSTART": "0",
             "DSH_API_KEY_ENV": self.settings.api_key_env,
+            "DSH_MODEL": self.settings.model,
             "TRITON_RISCV_MCP_PYTHON": self.settings.mcp_python,
             "TRITON_RISCV_ALLOW_VALIDATION": os.environ.get(
                 "TRITON_RISCV_ALLOW_VALIDATION", "0"

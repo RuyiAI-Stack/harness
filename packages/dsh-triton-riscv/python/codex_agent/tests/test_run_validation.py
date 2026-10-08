@@ -99,7 +99,7 @@ class RunValidationTests(unittest.TestCase):
             output=b"partial output",
         )
         with tempfile.TemporaryDirectory() as temp_dir, patch(
-            "codex_agent.run_validation.subprocess.run",
+            "codex_agent.run_validation.run_bounded",
             side_effect=timeout,
         ):
             root = Path(temp_dir)

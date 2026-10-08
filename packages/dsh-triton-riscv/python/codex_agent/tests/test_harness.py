@@ -96,7 +96,7 @@ class HarnessIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             settings = HarnessSettings.from_env(
                 Path(temporary),
-                {"ISRC_API_KEY": "test-key"},
+                {"ISRC_API_KEY": "test-key", "DSH_MODEL": "gpt-6-astra"},
             )
             backend = DeepSeekHarnessBackend(settings)
             events: list[dict[str, Any]] = []
@@ -109,6 +109,9 @@ class HarnessIntegrationTests(unittest.TestCase):
         self.assertEqual(instances[0].calls, ["first", "second"])
         self.assertEqual(instances[0].kwargs["session_root"], str(settings.session_root))
         self.assertEqual(instances[0].kwargs["cordis"], str(settings.cordis_path))
+        self.assertEqual(instances[0].kwargs["model"], "gpt-6-astra")
+        self.assertEqual(instances[0].kwargs["env"]["DSH_MODEL"], "gpt-6-astra")
+        self.assertNotIn("temperature", instances[0].kwargs)
         self.assertEqual(
             instances[0].kwargs["env"]["TRITON_RISCV_MCP_PYTHON"],
             settings.mcp_python,

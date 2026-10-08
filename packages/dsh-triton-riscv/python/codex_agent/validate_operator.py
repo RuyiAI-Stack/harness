@@ -8,6 +8,7 @@ import json
 import os
 import shlex
 import subprocess
+from codex_agent.process_control import run_bounded, validation_environment
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -61,6 +62,7 @@ class OperatorValidationResult:
     correctness: str = "unknown"
     stages: list[dict] = field(default_factory=list)
     diagnosis: dict = field(default_factory=dict)
+    isolation: dict = field(default_factory=dict)
 
 
 def load_operators(path: Path) -> list[dict]:
@@ -220,9 +222,10 @@ def run_operator(
         log_dir.mkdir(parents=True, exist_ok=True)
         log_path = log_dir / f"{run_id}.log"
         try:
-            completed = subprocess.run(
+            completed = run_bounded(
                 ["bash", "-lc", command],
                 cwd=repo_root,
+                env=validation_environment(),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,

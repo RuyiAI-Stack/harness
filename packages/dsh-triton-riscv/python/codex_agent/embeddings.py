@@ -199,8 +199,10 @@ def build_embedding_provider(
     api_key_env: str = "AGENT_EMBEDDING_API_KEY",
     tokenizer_json: str | None = None,
     token_budget: int | None = None,
+    use_environment: bool = True,
 ) -> EmbeddingProvider | None:
     """Build an optional provider without making an embedding request."""
+    env = os.environ if use_environment else {}
     if provider == "none":
         return None
     if provider == "sentence-transformers":
@@ -208,23 +210,23 @@ def build_embedding_provider(
             model=model or "sentence-transformers/all-MiniLM-L6-v2"
         )
     if provider == "ollama":
-        resolved_model = model or os.getenv("AGENT_EMBEDDING_MODEL")
+        resolved_model = model or env.get("AGENT_EMBEDDING_MODEL")
         if not resolved_model:
             raise ValueError("Ollama embeddings require a model")
         return OllamaEmbeddingProvider(
             model=resolved_model,
-            base_url=base_url or os.getenv(
+            base_url=base_url or env.get(
                 "AGENT_EMBEDDING_BASE_URL", "http://127.0.0.1:11434"
             ),
             token_budget=token_budget or (
-                int(os.environ["AGENT_EMBEDDING_TOKEN_BUDGET"])
-                if os.getenv("AGENT_EMBEDDING_TOKEN_BUDGET") else 256
+                int(env["AGENT_EMBEDDING_TOKEN_BUDGET"])
+                if env.get("AGENT_EMBEDDING_TOKEN_BUDGET") else 256
             ),
         )
     if provider == "openai-compatible":
-        resolved_url = base_url or os.getenv("AGENT_EMBEDDING_BASE_URL")
+        resolved_url = base_url or env.get("AGENT_EMBEDDING_BASE_URL")
         api_key = os.getenv(api_key_env)
-        resolved_model = model or os.getenv("AGENT_EMBEDDING_MODEL")
+        resolved_model = model or env.get("AGENT_EMBEDDING_MODEL")
         missing = [
             name
             for name, value in (
@@ -242,10 +244,10 @@ def build_embedding_provider(
             base_url=str(resolved_url),
             api_key=str(api_key),
             model=str(resolved_model),
-            tokenizer_json=tokenizer_json or os.getenv("AGENT_EMBEDDING_TOKENIZER_JSON"),
+            tokenizer_json=tokenizer_json or env.get("AGENT_EMBEDDING_TOKENIZER_JSON"),
             token_budget=token_budget or (
-                int(os.environ["AGENT_EMBEDDING_TOKEN_BUDGET"])
-                if os.getenv("AGENT_EMBEDDING_TOKEN_BUDGET") else None
+                int(env["AGENT_EMBEDDING_TOKEN_BUDGET"])
+                if env.get("AGENT_EMBEDDING_TOKEN_BUDGET") else None
             ),
         )
     raise ValueError(f"unknown embedding provider: {provider}")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .memory_selection import CandidateStrategy
+from codex_agent.runtime_config import CONFIG_ENV, runtime_config
 
 import os
 from pathlib import Path
@@ -27,9 +28,10 @@ MAX_MEMORY_RESULTS = 10
 
 def memory_database_path(repo_root: Path) -> Path:
     from codex_agent.paths import state_root
-    if "TRITON_RISCV_MEMORY_DB" not in os.environ:
+    value = runtime_config().memory.database
+    if value is None:
         return state_root(repo_root) / "memory.sqlite3"
-    configured = Path(os.environ.get("TRITON_RISCV_MEMORY_DB", MEMORY_DB.as_posix()))
+    configured = Path(value)
     if configured.is_absolute():
         return configured
     return repo_root.resolve() / configured
@@ -38,20 +40,15 @@ def memory_database_path(repo_root: Path) -> Path:
 def build_configured_embedding_provider():
     """Build an optional provider; lexical retrieval remains the default."""
 
-    provider = os.environ.get("TRITON_RISCV_EMBEDDING_PROVIDER", "none")
+    settings = runtime_config().memory.embedding
     return build_embedding_provider(
-        provider,
-        model=os.environ.get("TRITON_RISCV_EMBEDDING_MODEL"),
-        base_url=os.environ.get("TRITON_RISCV_EMBEDDING_BASE_URL"),
-        api_key_env=os.environ.get(
-            "TRITON_RISCV_EMBEDDING_API_KEY_ENV",
-            "AGENT_EMBEDDING_API_KEY",
-        ),
-        tokenizer_json=os.environ.get("TRITON_RISCV_EMBEDDING_TOKENIZER_JSON"),
-        token_budget=(
-            int(os.environ["TRITON_RISCV_EMBEDDING_TOKEN_BUDGET"])
-            if os.environ.get("TRITON_RISCV_EMBEDDING_TOKEN_BUDGET") else None
-        ),
+        settings.provider,
+        model=settings.model or None,
+        base_url=settings.baseUrl or None,
+        api_key_env=settings.apiKeyEnv,
+        tokenizer_json=settings.tokenizerJson or None,
+        token_budget=settings.tokenBudget,
+        use_environment=CONFIG_ENV not in os.environ,
     )
 
 
@@ -295,7 +292,7 @@ def retrieve_memories(
                 ),
                 limit,
                 exclude_source_runs=exclude_source_runs,
-                score_mode=os.environ.get("TRITON_RISCV_MEMORY_RETRIEVAL_MODE", "legacy"),
+                score_mode=runtime_config().memory.retrievalMode,
                 candidate_strategy=candidate_strategy,
             )
         from codex_agent.memory import render_memory_context

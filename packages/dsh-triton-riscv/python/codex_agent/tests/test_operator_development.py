@@ -125,8 +125,9 @@ class OperatorDevelopmentTests(unittest.TestCase):
         )
         self.assertIn("@triton.jit", (self.root / plan.implementation_file).read_text())
         self.assertIn("Immutable Contract", (self.root / plan.task_file).read_text())
-        repeated = apply_operator_implementation(self.root, proposal.proposal_id)
-        self.assertEqual(repeated.status, "already_applied")
+        with patch.dict("os.environ", {"TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY": "1"}):
+            repeated = apply_operator_implementation(self.root, proposal.proposal_id)
+        self.assertEqual(repeated.status, "applied")
         self.assertIn("validate_operator", repeated.message)
 
     def test_contract_audit_rejects_a_weakened_generated_test(self) -> None:
@@ -143,6 +144,15 @@ class OperatorDevelopmentTests(unittest.TestCase):
                 weak_test,
                 "This should be rejected.",
             )
+
+    def test_risky_generated_implementation_or_test_is_rejected(self) -> None:
+        plan = prepare_operator_development(self.root, valid_spec())
+        for implementation, test in (
+            (IMPLEMENTATION + '\nimport subprocess\n', TEST_SOURCE),
+            (IMPLEMENTATION, TEST_SOURCE + '\nfrom pathlib import Path\nPath("target").unlink()\n'),
+        ):
+            with self.subTest(implementation=implementation), self.assertRaisesRegex(ValueError, "risk screening"):
+                propose_operator_implementation(self.root, plan.development_id, implementation, test, "fixture")
 
     def test_existing_target_is_not_treated_as_a_new_operator(self) -> None:
         path = self.root / "python/examples/flaggems/square_new.py"

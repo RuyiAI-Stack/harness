@@ -24,7 +24,9 @@ function absolute(value, fallback, label) {
   return result
 }
 
-// Only this boundary translates typed host configuration to the Python ABI.
+export const CONFIG_ENV = 'TRITON_RISCV_CONFIG'
+
+// Native JS and Python share one versioned document, not individual settings in env.
 // Plugin code never changes process.env or inherits ambient capability switches.
 export function resolveConfig(input = {}) {
   const c = object(
@@ -33,7 +35,7 @@ export function resolveConfig(input = {}) {
     'triton-riscv config',
   )
   const p = object(c.permissions, ['validation', 'development', 'repair'], 'permissions')
-  const r = object(c.remote, ['host', 'repository', 'required'], 'remote')
+  const r = object(c.remote, ['host', 'repository', 'required', 'requireTaskQuotas'], 'remote')
   const m = object(c.memory, ['database', 'retrievalMode', 'contextFormat', 'embedding'], 'memory')
   const e = object(
     m.embedding,
@@ -42,13 +44,14 @@ export function resolveConfig(input = {}) {
   )
   const enabled = boolean(c.enabled, false, 'enabled')
   const repoRoot = absolute(c.repoRoot, '', 'repoRoot')
-  if (enabled && !repoRoot) throw new Error('Configure repoRoot before enabling triton-riscv-native-host')
   const python = absolute(c.python, join(packageRoot, '.venv/bin/python'), 'python')
   if (!python) throw new Error('python must name an absolute executable')
   const stateDir = absolute(c.stateDir, repoRoot ? join(repoRoot, 'agent-results') : '', 'stateDir')
   const host = text(r.host, '', 'remote.host')
   const repository = absolute(r.repository, '', 'remote.repository')
   const required = boolean(r.required, false, 'remote.required')
+  const requireTaskQuotas = boolean(r.requireTaskQuotas, false, 'remote.requireTaskQuotas')
+  if (requireTaskQuotas && !required) throw new Error('remote.requireTaskQuotas requires remote.required=true')
   if (Boolean(host) !== Boolean(repository) || (required && !host))
     throw new Error('remote.host and remote.repository must be configured together')
   if (host && !/^[A-Za-z0-9_.-]+$/.test(host)) throw new Error('Invalid remote.host')
@@ -59,43 +62,52 @@ export function resolveConfig(input = {}) {
   const tokenBudget = e.tokenBudget ?? null
   if (tokenBudget !== null && (!Number.isInteger(tokenBudget) || tokenBudget <= 0))
     throw new Error('embedding.tokenBudget must be a positive integer')
-  const env = {
-    TRITON_RISCV_REPO_ROOT: repoRoot,
-    TRITON_RISCV_STATE_DIR: stateDir,
-    TRITON_RISCV_MCP_PYTHON: python,
-    TRITON_RISCV_ALLOW_VALIDATION: boolean(p.validation, false, 'permissions.validation') ? '1' : '0',
-    TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY: boolean(p.development, false, 'permissions.development') ? '1' : '0',
-    TRITON_RISCV_ALLOW_REPAIR_APPLY: boolean(p.repair, false, 'permissions.repair') ? '1' : '0',
-    TRITON_RISCV_REQUIRE_APPROVED_VALIDATION: '1',
-    TRITON_RISCV_REQUIRE_REMOTE: required ? '1' : '0',
-    RISCV_HOST: host,
-    RISCV_REPO: repository,
-    TRITON_RISCV_MEMORY_DB: absolute(m.database, stateDir ? join(stateDir, 'memory.sqlite3') : '', 'memory.database'),
-    TRITON_RISCV_MEMORY_RETRIEVAL_MODE: text(m.retrievalMode, 'legacy', 'memory.retrievalMode'),
-    TRITON_RISCV_MEMORY_CONTEXT_FORMAT: text(m.contextFormat, 'classic', 'memory.contextFormat'),
-    TRITON_RISCV_EMBEDDING_PROVIDER: text(e.provider, 'none', 'embedding.provider'),
-    TRITON_RISCV_EMBEDDING_MODEL: text(e.model, '', 'embedding.model'),
-    TRITON_RISCV_EMBEDDING_BASE_URL: text(e.baseUrl, '', 'embedding.baseUrl'),
-    TRITON_RISCV_EMBEDDING_TOKENIZER_JSON: absolute(e.tokenizerJson, '', 'embedding.tokenizerJson'),
-    TRITON_RISCV_EMBEDDING_TOKEN_BUDGET: tokenBudget === null ? '' : String(tokenBudget),
-    TRITON_RISCV_EMBEDDING_API_KEY_ENV: keyName,
+  if (/^(TRITON_RISCV_|RISCV_)/.test(keyName) || ['PATH', 'HOME', 'PYTHONPATH', 'PYTHONHOME'].includes(keyName))
+    throw new Error('embedding.apiKeyEnv conflicts with a reserved configuration key')
+  return {
+    enabled,
+    repoRoot,
+    python,
+    stateDir,
+    permissions: {
+      validation: boolean(p.validation, false, 'permissions.validation'),
+      development: boolean(p.development, false, 'permissions.development'),
+      repair: boolean(p.repair, false, 'permissions.repair'),
+    },
+    remote: { host, repository, required, requireTaskQuotas },
+    memory: {
+      database: absolute(m.database, stateDir ? join(stateDir, 'memory.sqlite3') : '', 'memory.database'),
+      retrievalMode: text(m.retrievalMode, 'legacy', 'memory.retrievalMode'),
+      contextFormat: text(m.contextFormat, 'classic', 'memory.contextFormat'),
+      embedding: {
+        provider: text(e.provider, 'none', 'embedding.provider'),
+        model: text(e.model, '', 'embedding.model'),
+        baseUrl: text(e.baseUrl, '', 'embedding.baseUrl'),
+        tokenizerJson: absolute(e.tokenizerJson, '', 'embedding.tokenizerJson'),
+        tokenBudget,
+        apiKeyEnv: keyName,
+      },
+    },
   }
-  if (Object.hasOwn(env, keyName)) throw new Error('embedding.apiKeyEnv conflicts with a plugin configuration key')
-  return { enabled, repoRoot, python, stateDir, env }
+}
+export function workerEnvironment(config, ambient = process.env) {
+  const { enabled, python, ...settings } = config
+  const document = JSON.stringify({ schemaVersion: 1, ...settings })
+  if (Buffer.byteLength(document) > 65536) throw new Error('Triton-RISCV configuration exceeds 64 KiB')
+  const env = { [CONFIG_ENV]: document }
+  const key = config.memory.embedding.apiKeyEnv
+  if (ambient[key]) env[key] = ambient[key]
+  return env
 }
 export function bridgeEnvironment(config, ambient = process.env) {
   const inherited = Object.fromEntries(
     Object.entries(ambient).filter(([key]) => !/^(TRITON_RISCV_|RISCV_|AGENT_EMBEDDING_)/.test(key)),
   )
-  const env = { ...inherited, ...config.env }
-  const key = config.env.TRITON_RISCV_EMBEDDING_API_KEY_ENV
-  if (ambient[key]) env[key] = ambient[key]
-  return env
+  return { ...inherited, ...workerEnvironment(config, ambient) }
 }
 export function mcpConfiguration(config, ambient = process.env) {
-  const env = { ...config.env }
-  const key = env.TRITON_RISCV_EMBEDDING_API_KEY_ENV
-  if (ambient[key]) env[key] = ambient[key]
+  if (!config.repoRoot) throw new Error('Select a Harness session workspace before connecting Triton-RISCV tools')
+  const env = workerEnvironment(config, ambient)
   return {
     serverName: 'triton_riscv',
     transport: 'stdio',
@@ -109,9 +121,12 @@ export function mcpConfiguration(config, ambient = process.env) {
 }
 // Compatibility is confined to the optional standalone launcher, not apply().
 export function configFromEnvironment(env) {
+  const quota = (env.TRITON_RISCV_REQUIRE_TASK_QUOTAS ?? '0').trim().toLowerCase()
+  if (!['', '0', 'false', '1', 'true'].includes(quota))
+    throw new Error('TRITON_RISCV_REQUIRE_TASK_QUOTAS must be 0 or 1')
   return {
     enabled: true,
-    repoRoot: env.TRITON_RISCV_REPO_ROOT || env.TRITON_RISCV_CHECKOUT,
+    repoRoot: env.TRITON_RISCV_REPO_ROOT || env.TRITON_RISCV_CHECKOUT || env.DSH_CWD,
     python: env.TRITON_RISCV_MCP_PYTHON,
     stateDir: env.TRITON_RISCV_STATE_DIR,
     permissions: {
@@ -123,6 +138,7 @@ export function configFromEnvironment(env) {
       host: env.RISCV_HOST,
       repository: env.RISCV_REPO,
       required: env.TRITON_RISCV_REQUIRE_REMOTE === '1',
+      requireTaskQuotas: quota === '1' || quota === 'true',
     },
     memory: {
       database: env.TRITON_RISCV_MEMORY_DB,

@@ -138,7 +138,7 @@ class ValidateOperatorTests(unittest.TestCase):
                 output=b"partial",
             )
             with patch(
-                "codex_agent.validate_operator.subprocess.run",
+                "codex_agent.validate_operator.run_bounded",
                 side_effect=timeout,
             ):
                 failed = run_operator(

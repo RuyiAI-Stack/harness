@@ -19,8 +19,8 @@
         api: openai-responses
         baseURL: !!js process.env.ISRC_BASE_URL ?? 'https://llmapi.isrc.ac.cn/v1'
         models:
-          - id: gpt-5.6-sol
-            name: GPT-5.6 SOL
+          - id: !!js process.env.DSH_MODEL ?? 'gpt-5.6-sol'
+            name: !!js process.env.DSH_MODEL ?? 'gpt-5.6-sol'
 
 - id: sessions
   name: '@deepseek-ai/dsh-session-persistence-jsonl'

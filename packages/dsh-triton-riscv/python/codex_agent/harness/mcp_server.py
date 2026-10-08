@@ -33,7 +33,9 @@ from codex_agent.operator_lifecycle import (
 )
 from codex_agent.operator_tools import (
     DiscoverOperatorResult,
+    OperatorFileResult,
     discover_operator_evidence,
+    read_operator_file,
 )
 from codex_agent.remote_executor import (
     RemotePreflightResult,
@@ -78,7 +80,7 @@ def prepare_validation_job_tool(targets: list[str],
 @server.tool(name="execute_validation_job", structured_output=True,
              annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True, open_world_hint=True))
 def execute_validation_job_tool(job_id: str) -> dict[str, Any]:
-    """Request native approval then execute a source-locked validation job once. Return every target result, including failures."""
+    """Request native approval then execute a source-locked job. New remote operator batches resume the SAME job_id after disconnect: replay committed children, collect active children, start only pending children. Completed jobs replay results; never replace unknown jobs with new IDs."""
     from codex_agent.project_tools import execute_validation_job
     return execute_validation_job(repository_root(), job_id)
 
@@ -86,9 +88,9 @@ def execute_validation_job_tool(job_id: str) -> dict[str, Any]:
 @server.tool(name="get_validation_job", structured_output=True,
              annotations=ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=False))
 def get_validation_job_tool(job_id: str) -> dict[str, Any]:
-    """Read persisted per-target results, including completed work in interrupted jobs. Never replay a consumed job."""
-    from codex_agent.project_tools import load_job
-    return load_job(repository_root(), job_id)
+    """Read persisted results and local batch progress. No SSH or execution; a progress cursor is not evidence of test success."""
+    from codex_agent.project_tools import get_validation_job
+    return get_validation_job(repository_root(), job_id)
 
 
 @server.tool(name="evaluate_plugin_fixtures", structured_output=True,
@@ -116,12 +118,20 @@ def retrieve_operator_memory_tool(
 @server.tool(name="execute_approved_validation", structured_output=True,
              annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True, open_world_hint=True))
 def execute_approved_validation_tool(run_id: str) -> ValidationToolResult:
-    """Execute the exact host-approved validation plan. Approval cannot be granted by the model."""
+    """Execute the exact host-approved plan. After SSH loss, use the SAME run_id to collect its original remote job, not restart. Unknown evidence needs host inspection. The model cannot grant approval."""
     from codex_agent.operator_lifecycle import _load_receipt
     root = repository_root()
     receipt = _load_receipt(root, run_id)
     return validate_operator_target(root, receipt["operator"], execute=True, approved_run_id=run_id,
         source_env=receipt.get("source_env", True), timeout_seconds=receipt.get("timeout_seconds", 900))
+
+
+@server.tool(name="get_validation_status", structured_output=True,
+             annotations=ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=True))
+def get_validation_status_tool(run_id: str, remote: bool = False) -> dict[str, Any]:
+    """Inspect the original approved plan ID. Default reads local evidence; remote=true only queries its existing remote job. Never starts, repairs, cleans or reruns anything. A remote completed state is not a verified pass until the local receipt is committed. Report unknown honestly."""
+    from codex_agent.remote_maintenance import validation_status
+    return validation_status(repository_root(), run_id, remote=remote)
 
 
 @server.tool(name="apply_development_proposal", structured_output=True,
@@ -177,6 +187,14 @@ def discover_operator_tool(operator_name: str) -> DiscoverOperatorResult:
     """Discover repository evidence for an exact operator name."""
 
     return discover_operator_evidence(repository_root(), operator_name)
+
+
+@server.tool(name="read_operator_file", structured_output=True,
+             annotations=ToolAnnotations(read_only_hint=True, destructive_hint=False,
+                                         idempotent_hint=True, open_world_hint=False))
+def read_operator_file_tool(path: str, start_line: int = 1, max_lines: int = 200) -> OperatorFileResult:
+    """Read repository-relative FlagGems .py source/tests or tasks/operators .md. No execution. At most 400 lines/32 KiB per page; use next_line for more. Returns a source hash, not validation proof."""
+    return read_operator_file(repository_root(), path, start_line, max_lines)
 
 
 @server.tool(
@@ -267,7 +285,7 @@ def propose_operator_implementation_tool(
     title="Apply an approved new operator",
     description=(
         "Create implementation, test, and task files from a separately approved "
-        "proposal. The host must enable TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY=1."
+        "proposal. The host must enable permissions.development in plugin configuration."
     ),
     annotations=ToolAnnotations(
         read_only_hint=False,
@@ -288,7 +306,7 @@ def apply_operator_implementation_tool(
     title="Validate Triton-RISCV operator",
     description=(
         "Create a validation plan by default. Set execute=true only after user "
-        "approval; the host must also enable TRITON_RISCV_ALLOW_VALIDATION=1."
+        "approval; the host must also enable permissions.validation in plugin configuration."
     ),
     annotations=ToolAnnotations(
         read_only_hint=False,
@@ -364,7 +382,7 @@ def propose_repair_tool(
     title="Apply approved operator repair",
     description=(
         "Apply a separately approved repair proposal. The host must enable "
-        "TRITON_RISCV_ALLOW_REPAIR_APPLY=1; tests are integrity locked."
+        "permissions.repair in plugin configuration; tests are integrity locked."
     ),
     annotations=ToolAnnotations(
         read_only_hint=False,
@@ -381,6 +399,8 @@ def apply_repair_tool(proposal_id: str) -> ApplyRepairResult:
 def main() -> None:
     """Run the local MCP server over stdio for DeepSeek Harness."""
 
+    from codex_agent.runtime_config import runtime_config
+    runtime_config()
     server.run(transport="stdio")
 
 

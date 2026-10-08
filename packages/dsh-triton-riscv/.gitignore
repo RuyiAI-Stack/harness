@@ -18,3 +18,4 @@ __pycache__/
 !lib/native-*.js
 !lib/config.js
 !lib/prompts.js
+!lib/tool-policy.js
