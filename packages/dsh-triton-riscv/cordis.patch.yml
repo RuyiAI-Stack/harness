@@ -1,0 +1,16 @@
+# Configure triton-riscv-native-host in the repository's config.yml.
+# Installing the bundle never launches Python or runs a test by itself.
+- insert:
+    - id: triton-riscv-domain-policy
+      name: dsh-triton-riscv
+
+    - id: triton-riscv-native-host
+      name: dsh-triton-riscv/native
+      config:
+        enabled: false
+
+    # Dependency anchor only. The native-host plugin mounts a scoped MCP child
+    # with validated config. Do not enable a second instance of this namespace.
+    - id: mcp-triton-riscv
+      name: '@deepseek-ai/dsh-mcp-client'
+      disabled: true

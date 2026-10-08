@@ -1,0 +1,1846 @@
+{
+  "schema_version": 1,
+  "purpose": "source provenance, not execution evidence",
+  "sources": {
+    "rag_workspace": "/Users/cl25/ruyi_AI",
+    "live_workbench": "/Users/cl25/triton-riscv-tool-pr"
+  },
+  "excluded": [
+    "credentials",
+    "virtual environments",
+    "runtime databases",
+    "raw experiment results",
+    "compiler and operator checkout"
+  ],
+  "files": [
+    {
+      "path": "frontend/src/api.test.ts",
+      "sha256": "44682a49ccad0a834df380188f222ec9bc16cc205c15a7d9ed997f14792cbf28",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/frontend/src/api.test.ts",
+          "sha256": "d5a90ef0be6cb1823d95cde227fd252aac5578b4cd502929854b02e2e1aca484"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/frontend/src/api.test.ts",
+          "sha256": "44682a49ccad0a834df380188f222ec9bc16cc205c15a7d9ed997f14792cbf28"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "frontend/src/api.ts",
+      "sha256": "be14c42e0a71aa30b96a3e49e52124b4c79e4ad49ab2abdc9683b8c12cf312d5",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/frontend/src/api.ts",
+          "sha256": "b6ba41a88ceba92c843dc3ff09bb288f806d3faca0c5288656f1171fe4bac92d"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/frontend/src/api.ts",
+          "sha256": "be14c42e0a71aa30b96a3e49e52124b4c79e4ad49ab2abdc9683b8c12cf312d5"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "frontend/src/App.tsx",
+      "sha256": "cfb1a500391877fadf8a7bccd895205dcb6764a1243490a5bf8a4d0c9287afb5",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/frontend/src/App.tsx",
+          "sha256": "241816adf88a6762b3a013ec09a665d05cf173fa926210f230325e1d940e0f69"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/frontend/src/App.tsx",
+          "sha256": "cfb1a500391877fadf8a7bccd895205dcb6764a1243490a5bf8a4d0c9287afb5"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "frontend/src/format.test.tsx",
+      "sha256": "43f2fc089b334b05fc6cb7b9fb5361ae91746eb623a87deb7ce0d8a63d3420e0",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/frontend/src/format.test.tsx",
+          "sha256": "43f2fc089b334b05fc6cb7b9fb5361ae91746eb623a87deb7ce0d8a63d3420e0"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/frontend/src/format.test.tsx",
+          "sha256": "43f2fc089b334b05fc6cb7b9fb5361ae91746eb623a87deb7ce0d8a63d3420e0"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "frontend/src/format.tsx",
+      "sha256": "956c66b225b4cecd9ce1dbc588deb6efea16dcd8449fdb95336b0fdae745bd63",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/frontend/src/format.tsx",
+          "sha256": "956c66b225b4cecd9ce1dbc588deb6efea16dcd8449fdb95336b0fdae745bd63"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/frontend/src/format.tsx",
+          "sha256": "956c66b225b4cecd9ce1dbc588deb6efea16dcd8449fdb95336b0fdae745bd63"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "frontend/src/main.tsx",
+      "sha256": "05b4005286642cf48b12fc75495e9e78598ed0c609116b7eeb2baf9b491e5123",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/frontend/src/main.tsx",
+          "sha256": "05b4005286642cf48b12fc75495e9e78598ed0c609116b7eeb2baf9b491e5123"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/frontend/src/main.tsx",
+          "sha256": "05b4005286642cf48b12fc75495e9e78598ed0c609116b7eeb2baf9b491e5123"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "frontend/src/styles.css",
+      "sha256": "f9477bff0fed229d33a25843eec375cc29141accf26ccf2bf9feb202861bf8d9",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/frontend/src/styles.css",
+          "sha256": "c7071ea9b93837ca872904dc1dd397b7860e86334df2ee14aa835949ed70d955"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/frontend/src/styles.css",
+          "sha256": "f9477bff0fed229d33a25843eec375cc29141accf26ccf2bf9feb202861bf8d9"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "frontend/src/test/setup.ts",
+      "sha256": "9b328c4843431fa76d8de00008fc159e95f99a840211085ff3b8f25e53d14409",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/frontend/src/test/setup.ts",
+          "sha256": "9b328c4843431fa76d8de00008fc159e95f99a840211085ff3b8f25e53d14409"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/frontend/src/test/setup.ts",
+          "sha256": "9b328c4843431fa76d8de00008fc159e95f99a840211085ff3b8f25e53d14409"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "frontend/src/types.ts",
+      "sha256": "d56d88921d6b498a3ea2cbb92c3ce891de2fd7a7be1eebb0c5dfaded35df83fb",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/frontend/src/types.ts",
+          "sha256": "8b61cc40c65d3a07bac0bfa18a51251dc3f998d184344f8f4d7871bbfde289a0"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/frontend/src/types.ts",
+          "sha256": "d56d88921d6b498a3ea2cbb92c3ce891de2fd7a7be1eebb0c5dfaded35df83fb"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/__init__.py",
+      "sha256": "44f841a14f4e1ef09eb352f7a788dc590898aef9f64abad3b3513f86bacc93dc",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/__init__.py",
+          "sha256": "b44d1cc24b36956d289b010d64843d5a5f0758997c00c40112b00ae18ce6f600"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/__init__.py",
+          "sha256": "7a3e319efa20b3c34f08d352f4c0402988d62a26806539ecb2fdf249d9681171"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/adapters/__init__.py",
+      "sha256": "a11ec6a42b3ebe7b2e6516002a80bcd4e8c19bedc64e1a9ed838c714475f8071",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/adapters/__init__.py",
+          "sha256": "a11ec6a42b3ebe7b2e6516002a80bcd4e8c19bedc64e1a9ed838c714475f8071"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/adapters/codex_cli.py",
+      "sha256": "5f09649c5cc7bff2876f68bfd50985fec20a411c5d21a18ce6ec2adbbed1ec42",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/adapters/codex_cli.py",
+          "sha256": "5f09649c5cc7bff2876f68bfd50985fec20a411c5d21a18ce6ec2adbbed1ec42"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/core/__init__.py",
+      "sha256": "23e7da164f732b57e4ee50ec32e42940b5990c1476274033df57b208b4504976",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/core/__init__.py",
+          "sha256": "23e7da164f732b57e4ee50ec32e42940b5990c1476274033df57b208b4504976"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/core/ports.py",
+      "sha256": "f93edadbc7fc498133c8292a0732d37b18abd1f3628bcebeeb52f902dd659a30",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/core/ports.py",
+          "sha256": "f93edadbc7fc498133c8292a0732d37b18abd1f3628bcebeeb52f902dd659a30"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/core/workflow.py",
+      "sha256": "2ecb6cfeae4622f6d9abd301d2d7c731608739cd1aa1e1aac3710cc15a51edfe",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/core/workflow.py",
+          "sha256": "2ecb6cfeae4622f6d9abd301d2d7c731608739cd1aa1e1aac3710cc15a51edfe"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/demo.py",
+      "sha256": "6e4e80a085d5149a887c13ddb9ba897de07e51de9817247e24a0ea06a44594a1",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/demo.py",
+          "sha256": "6e4e80a085d5149a887c13ddb9ba897de07e51de9817247e24a0ea06a44594a1"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/develop_operator.py",
+      "sha256": "dd4ba5b95996def84b4354ce5cd0ca048c024de08e16c8453769dfbe041e28a7",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/develop_operator.py",
+          "sha256": "329ab2590f92194842b587302a68cb8f48bfb62e83e36d449077eeb8c48c3e64"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/develop_operator.py",
+          "sha256": "ad10e70d4edb93c2d0e9bcdb228dd58db5a82e94c38c1cc185c5e7a7aa4d9a09"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/diagnostic_memory.py",
+      "sha256": "619414934733d0f0e532a53862c4404a9b8b0bcbd446911ca74d8b6f58116d76",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/diagnostic_memory.py",
+          "sha256": "338dafa66eb9d7d8001995c3e07e441e590e3ecf537ff4225ea0703f226e35bd"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/discover_operators.py",
+      "sha256": "a1b58c596f1b846b56095ca4fad981cde79ae735364ce77fb549a94e8ed5eae5",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/discover_operators.py",
+          "sha256": "a1b58c596f1b846b56095ca4fad981cde79ae735364ce77fb549a94e8ed5eae5"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/discover_operators.py",
+          "sha256": "0aecf1a19fcf6842b09ff94d7a920a3c633f8fd09ee159b6a37aa3c5b9458d87"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/discover.py",
+      "sha256": "35336170ec339227e3ec1c15f729dc744de19d9428c3261e26020a827523a349",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/discover.py",
+          "sha256": "35336170ec339227e3ec1c15f729dc744de19d9428c3261e26020a827523a349"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/discover.py",
+          "sha256": "86e001dbbd7ed634f7da2212cad6c0b7895a371c28c3d6e5d97d619be6182dcb"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/docs/conversation-context.md",
+      "sha256": "96cbb7e261a8fbdd7f575fc2e08316e2f30fe4c1d680cecd850e0e0957bd4c5c",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/docs/conversation-context.md",
+          "sha256": "96cbb7e261a8fbdd7f575fc2e08316e2f30fe4c1d680cecd850e0e0957bd4c5c"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/docs/deepseek-harness-integration.md",
+      "sha256": "224d42bc02120a5c3c733c076e2b694655b26efe85e13c50a6e75d7db74ed58d",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/docs/deepseek-harness-integration.md",
+          "sha256": "224d42bc02120a5c3c733c076e2b694655b26efe85e13c50a6e75d7db74ed58d"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/docs/deepseek-harness-integration.md",
+          "sha256": "60f5cc606aecaae9551e1d99ddcd2b7aa6cbe3afd2686d665b8689e22c574d12"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/docs/failure-diagnosis.md",
+      "sha256": "208ed777ce1ff89f95f0251649f435381e6039ebbd885b3ebb126fd44e142781",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/docs/failure-diagnosis.md",
+          "sha256": "208ed777ce1ff89f95f0251649f435381e6039ebbd885b3ebb126fd44e142781"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/docs/langgraph-agent.md",
+      "sha256": "3dd7dc51cf48b2c15a4d467be7bc1ca32145d78a1f24c87ed1f72a23a2a9d33e",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/docs/langgraph-agent.md",
+          "sha256": "3dd7dc51cf48b2c15a4d467be7bc1ca32145d78a1f24c87ed1f72a23a2a9d33e"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/docs/memory-context.md",
+      "sha256": "37373c66911fd90b6228e3bef8a4cf267593f6255d6d8f89146281d918f4f77e",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/docs/memory-context.md",
+          "sha256": "37373c66911fd90b6228e3bef8a4cf267593f6255d6d8f89146281d918f4f77e"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/docs/memory-evidence.md",
+      "sha256": "203d4052c34c496d8c95e49e171e6836c3e1ac05eb326716f4741c101689d041",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/docs/memory-evidence.md",
+          "sha256": "203d4052c34c496d8c95e49e171e6836c3e1ac05eb326716f4741c101689d041"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/docs/memory-selection.md",
+      "sha256": "96b3632801cd1c1e1ff78334cf33870446c6c3eae5ed52a3b64f45679b4f470a",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/docs/memory-selection.md",
+          "sha256": "96b3632801cd1c1e1ff78334cf33870446c6c3eae5ed52a3b64f45679b4f470a"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/docs/rag-ablation.md",
+      "sha256": "62efc3de53a61067ba5407ffc68d4874ffbd1df741b6e37d7ab135f77b399ad1",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/docs/rag-ablation.md",
+          "sha256": "62efc3de53a61067ba5407ffc68d4874ffbd1df741b6e37d7ab135f77b399ad1"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/embeddings.py",
+      "sha256": "cc633719884be3b2355a3c40b3e8fb996f46bbd0c2effd98bdef822eda3a58a7",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/embeddings.py",
+          "sha256": "cc633719884be3b2355a3c40b3e8fb996f46bbd0c2effd98bdef822eda3a58a7"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/evaluate_diagnosis.py",
+      "sha256": "5b7869957dad937eddcc570bba5f5fabc66adad9c876b8a42063a4f11ebd6cb5",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/evaluate_diagnosis.py",
+          "sha256": "5e5ec039b8f3641270d0bbc7ed1943dff04191cf8e629d4afc3f4859252f8c1d"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/evaluate_memory_modes.py",
+      "sha256": "e46551b42a25cc716ec81d4b6833d522f67cc2affad9b086cea73e75fbbe841c",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/evaluate_memory_modes.py",
+          "sha256": "14962d71e300af40794159374b409f690b2a2043beaa303328a6010ffebd01a6"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/evaluate_memory_retrieval.py",
+      "sha256": "c22e23ead765115a6247eb2fae44958502811a3da9fbf3dc770b238a54aa76e6",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/evaluate_memory_retrieval.py",
+          "sha256": "324640329385ac353eb902308f91389b4d1b805ce3a2473570e7bd53910ed47a"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/failure_diagnosis.py",
+      "sha256": "df3dac265fe810f518ca03b63db5213b169db1a58dfda1e83ca106e2aade3241",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/failure_diagnosis.py",
+          "sha256": "df3dac265fe810f518ca03b63db5213b169db1a58dfda1e83ca106e2aade3241"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/harness/__init__.py",
+      "sha256": "9a52f8957e5403a3e10edc991974f448bb02176fe35e3de601c34c54f3f3e374",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/harness/__init__.py",
+          "sha256": "9a52f8957e5403a3e10edc991974f448bb02176fe35e3de601c34c54f3f3e374"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/harness/__init__.py",
+          "sha256": "9a52f8957e5403a3e10edc991974f448bb02176fe35e3de601c34c54f3f3e374"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/harness/__main__.py",
+      "sha256": "50c4c2a3c10dc2438358a275564c30c6f949e118995bd6ce9208a3f09a4b3130",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/harness/__main__.py",
+          "sha256": "50c4c2a3c10dc2438358a275564c30c6f949e118995bd6ce9208a3f09a4b3130"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/harness/__main__.py",
+          "sha256": "50c4c2a3c10dc2438358a275564c30c6f949e118995bd6ce9208a3f09a4b3130"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/harness/cli.py",
+      "sha256": "f5c7f25468a863403e11bc349501d8e1e358a4a37d002b69c2d19d4144a6f7d9",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/harness/cli.py",
+          "sha256": "f5c7f25468a863403e11bc349501d8e1e358a4a37d002b69c2d19d4144a6f7d9"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/harness/cli.py",
+          "sha256": "f5c7f25468a863403e11bc349501d8e1e358a4a37d002b69c2d19d4144a6f7d9"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/harness/config.py",
+      "sha256": "ef98c77233e4f70eb3ab3f6c5dde19c8efc8e9d22c23a5474e48eb3fcaf23cae",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/harness/config.py",
+          "sha256": "89ecb808a97085dafbaf179879701591d37e3a95ee4cdf7b704066e67712c858"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/harness/config.py",
+          "sha256": "0edf2704ac387286ea38db4d7e06f8b5955aa66d2157165d1bff326091d0739b"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/harness/context.py",
+      "sha256": "067fd991aeac3271ce875ac0ccc315a1a7ebd79f8ffde1cd6c2929ef817bdd0f",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/harness/context.py",
+          "sha256": "3ae0d1557c949c8e467aecbb88bfbbec5ada2a5be8e7d717bd7392a3663a6908"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/harness/context.py",
+          "sha256": "067fd991aeac3271ce875ac0ccc315a1a7ebd79f8ffde1cd6c2929ef817bdd0f"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/harness/cordis.yml",
+      "sha256": "fa5c3e2fcc9367e7cbbb47e280fee3bc56bd7f48f66a880b1a9b66cfbad61748",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/harness/cordis.yml",
+          "sha256": "de5ea88e2d585641c21c4cbb47be951b911303d5c4ba39b20398b26904f26163"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/harness/cordis.yml",
+          "sha256": "8dbae51a4ee3582a9516ab3e69d4873d8a3ec868089cb6e84d3a8a94e51de46b"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/harness/mcp_demo.py",
+      "sha256": "13016596776f8587c287891983b32d623941ec776c7c78f8f09dc121fad12d46",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/harness/mcp_demo.py",
+          "sha256": "7a6126e386548477220f049cac0f15c0a8583d115263eee70f8bd34037e55dbe"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/harness/mcp_demo.py",
+          "sha256": "7a6126e386548477220f049cac0f15c0a8583d115263eee70f8bd34037e55dbe"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/harness/mcp_server.py",
+      "sha256": "7cd1a8b2a59f0b83e1b341d97a68ad95c820974a1d18506bb7f4b4efa4337685",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/harness/mcp_server.py",
+          "sha256": "179b43e5eafa05daa720365fcfe35b542bfefc749af00d4ebe4dd00def8ca66e"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/harness/mcp_server.py",
+          "sha256": "49defafb35bec624811f36c92cb9c9f90192c54b82441ed9f8a831072941d71b"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/harness/plugin.py",
+      "sha256": "d6f70176c4b5b5c87558a9fb56ebd29ab90ceff411b060dc712b7eb8c4afb8fd",
+      "candidates": [
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/harness/plugin.py",
+          "sha256": "bf4ea5cf972da9ceb5c0de01da073b00b11b1b5bce6807f2d17c6f5914540128"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/harness/requirements.txt",
+      "sha256": "faecb91ab1c9fb61a300da33442c681ff37ecf452b702606682345256cae3d10",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/harness/requirements.txt",
+          "sha256": "faecb91ab1c9fb61a300da33442c681ff37ecf452b702606682345256cae3d10"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/harness/requirements.txt",
+          "sha256": "faecb91ab1c9fb61a300da33442c681ff37ecf452b702606682345256cae3d10"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/harness/runtime.py",
+      "sha256": "3591ba495c0bd0d571c3b2ad382f27ed333b8967dc69b28ed41c95205ee890ce",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/harness/runtime.py",
+          "sha256": "e633a19ba356bbd905e544f6c965659ba8e1716d33a9faf2af9a3ae5f7f899f7"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/harness/runtime.py",
+          "sha256": "a12a45dc6bb7e700d3dbd88f30c2d18a122be97883a83c1fd31da1108d705e6c"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/langgraph_agent/__init__.py",
+      "sha256": "fb3e4d5f278c2ec681b29fda62d5029601dd7a4ee016c1565d08aa99a26723d1",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/langgraph_agent/__init__.py",
+          "sha256": "fb3e4d5f278c2ec681b29fda62d5029601dd7a4ee016c1565d08aa99a26723d1"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/langgraph_agent/__main__.py",
+      "sha256": "3d2438ae92f4746e9ffaa1f837b1fe803f6281091d1f31f8c95643716f257d9a",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/langgraph_agent/__main__.py",
+          "sha256": "3d2438ae92f4746e9ffaa1f837b1fe803f6281091d1f31f8c95643716f257d9a"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/langgraph_agent/cli.py",
+      "sha256": "fa7ec12295393a085477042b34c94c9bbd95ee01fd17d71c17e4d16702a20f6c",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/langgraph_agent/cli.py",
+          "sha256": "fa7ec12295393a085477042b34c94c9bbd95ee01fd17d71c17e4d16702a20f6c"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/langgraph_agent/graph.py",
+      "sha256": "3087cd9765e3a8cef080881edb6034e098cb04321bb0f3e704c6f7eb6ef3c90f",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/langgraph_agent/graph.py",
+          "sha256": "3087cd9765e3a8cef080881edb6034e098cb04321bb0f3e704c6f7eb6ef3c90f"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/langgraph_agent/reasoner.py",
+      "sha256": "d242812200819c76d6c9639010880e6e4e609a86374d5e34d27ba71ec39b0bf5",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/langgraph_agent/reasoner.py",
+          "sha256": "d242812200819c76d6c9639010880e6e4e609a86374d5e34d27ba71ec39b0bf5"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/langgraph_agent/requirements.txt",
+      "sha256": "2ac98b3736c3e61753a62c7c276740e0e3a5b0bd16465878dd0514b53cae3b46",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/langgraph_agent/requirements.txt",
+          "sha256": "2ac98b3736c3e61753a62c7c276740e0e3a5b0bd16465878dd0514b53cae3b46"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/langgraph_agent/runtime.py",
+      "sha256": "c6c700ac36ce9b83c999d652df6e9f6063ccd8fe9e83c34f7f63e44ad4ba187c",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/langgraph_agent/runtime.py",
+          "sha256": "c6c700ac36ce9b83c999d652df6e9f6063ccd8fe9e83c34f7f63e44ad4ba187c"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/langgraph_agent/state.py",
+      "sha256": "3ba9970f843001f843802aa4124fdb576fbc1e913971a1c0922fd2c59cbfe023",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/langgraph_agent/state.py",
+          "sha256": "3ba9970f843001f843802aa4124fdb576fbc1e913971a1c0922fd2c59cbfe023"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/langgraph_agent/tools.py",
+      "sha256": "a8ae8f9fe3f2702a4372dcad2ee06995e186055dc2763c17f9d0d8f6b5da7ce9",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/langgraph_agent/tools.py",
+          "sha256": "a8ae8f9fe3f2702a4372dcad2ee06995e186055dc2763c17f9d0d8f6b5da7ce9"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/memory_api.py",
+      "sha256": "b7ba1836de6e3bf017853b6eddfee620ac9b2167bfac8c535004751741b825e4",
+      "candidates": [],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/memory_chunking.py",
+      "sha256": "08a7e6aa747cc65acf0c1e95fb0a1399d2dce10f2ca78102fa9a3f4472d09796",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/memory_chunking.py",
+          "sha256": "08a7e6aa747cc65acf0c1e95fb0a1399d2dce10f2ca78102fa9a3f4472d09796"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/memory_context.py",
+      "sha256": "50d041f02c74d7a7787b604c7d82fc819135f44ba0f6ef55b128d9a3c98ed6e2",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/memory_context.py",
+          "sha256": "50d041f02c74d7a7787b604c7d82fc819135f44ba0f6ef55b128d9a3c98ed6e2"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/memory_evidence.py",
+      "sha256": "f82ef83e182d97e74942b6cfff80e39462116bbbe603ebb951fdb8cd11700cdb",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/memory_evidence.py",
+          "sha256": "f82ef83e182d97e74942b6cfff80e39462116bbbe603ebb951fdb8cd11700cdb"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/memory_selection.py",
+      "sha256": "74543540187f5b53ec13aae22aba7cea9fa8f6dd35d10f272ad9c9848712833c",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/memory_selection.py",
+          "sha256": "74543540187f5b53ec13aae22aba7cea9fa8f6dd35d10f272ad9c9848712833c"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/memory_view.py",
+      "sha256": "08768d4a9161c89eb25279b8fab3fb72e0220192be8f6b06f56cc79ed513123e",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/memory_view.py",
+          "sha256": "08768d4a9161c89eb25279b8fab3fb72e0220192be8f6b06f56cc79ed513123e"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/MEMORY.md",
+      "sha256": "2000a1f087bbe44576c1bf9119f7f163a9b6ecb84efdf12a63faa37179d7e56c",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/MEMORY.md",
+          "sha256": "2000a1f087bbe44576c1bf9119f7f163a9b6ecb84efdf12a63faa37179d7e56c"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/memory.py",
+      "sha256": "9a081a5f4415ad620f29e420db5339abcf535bf1c0ec7ea20080b9fbb61dfd2f",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/memory.py",
+          "sha256": "9a081a5f4415ad620f29e420db5339abcf535bf1c0ec7ea20080b9fbb61dfd2f"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/model_router.py",
+      "sha256": "7a89c42f0e011e8115c9c08fd33f883ea1bb7b63b3a2bca6f98b34dbf8e263a1",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/model_router.py",
+          "sha256": "7a89c42f0e011e8115c9c08fd33f883ea1bb7b63b3a2bca6f98b34dbf8e263a1"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/operator_agent.py",
+      "sha256": "685990be0270c6ea3f717c696f6f73ad1f8ee0ee711b1d9933ec4140328810b6",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/operator_agent.py",
+          "sha256": "685990be0270c6ea3f717c696f6f73ad1f8ee0ee711b1d9933ec4140328810b6"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/operator_agent.py",
+          "sha256": "442e44ed832ec98146cc998bb8c65502ed9f8779321e18ff6515650ff3cf087e"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/operator_baseline.py",
+      "sha256": "5c5001d0563e8d2a3bf9c5b7eaa84d6d7669edc2292bb7f7bb3f70b9b3e2f642",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/operator_baseline.py",
+          "sha256": "5c5001d0563e8d2a3bf9c5b7eaa84d6d7669edc2292bb7f7bb3f70b9b3e2f642"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/operator_development.py",
+      "sha256": "5defc1bc7c3fbc295a68f39c22c90f00bb62d3c395112dca2b930531bd72c8e1",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/operator_development.py",
+          "sha256": "c512b590e275134796d6674b7e660b2d1c3fb8d348048bb0cc944bcbb3f158c7"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/operator_development.py",
+          "sha256": "5defc1bc7c3fbc295a68f39c22c90f00bb62d3c395112dca2b930531bd72c8e1"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/operator_lifecycle.py",
+      "sha256": "aed795dc856683cd143c1fc3b9a67822956b8fd95ad5176ea992f7d81e82c862",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/operator_lifecycle.py",
+          "sha256": "303e783585fb5c1f2d41881e943f352b7e4149166f02ce621c3b6efc541a9b80"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/operator_lifecycle.py",
+          "sha256": "d64d3066e91b244494f1d0df69394ea158f17c5becf7dca9e3565144f701f062"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/operator_status.py",
+      "sha256": "fbee512373cacb300817495e82dc6b211db741855525b6e91dbb6d22cf738ea6",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/operator_status.py",
+          "sha256": "fbee512373cacb300817495e82dc6b211db741855525b6e91dbb6d22cf738ea6"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/operator_status.py",
+          "sha256": "23d96677068b561b5b37183be4a2e4e49c1337f91590c906d27b66954e56b534"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/operator_tools.py",
+      "sha256": "280240beeb6cb9c825ca507c642f0ec369fb0ef58ff2dc8b5d41356e07323a00",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/operator_tools.py",
+          "sha256": "280240beeb6cb9c825ca507c642f0ec369fb0ef58ff2dc8b5d41356e07323a00"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/operator_tools.py",
+          "sha256": "ecea11b26d98b1e9b0f2f1044b0df31af2658cf96320369c3c048abef3d6397b"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/operator-spec.schema.json",
+      "sha256": "2b56691bb55e9cad79f95a28de3ebda59f3dc9290eb828f4d7feacd837680507",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/operator-spec.schema.json",
+          "sha256": "2b56691bb55e9cad79f95a28de3ebda59f3dc9290eb828f4d7feacd837680507"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/operator-spec.schema.json",
+          "sha256": "2b56691bb55e9cad79f95a28de3ebda59f3dc9290eb828f4d7feacd837680507"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/paths.py",
+      "sha256": "b7c17d27e20111dddc13b2467ca44891889bdcf9e3b836a2e5d410e9c2745216",
+      "candidates": [],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/pipeline_observer.py",
+      "sha256": "ed584d2eef80dfa2b85edaa3b1cbcd54163514ef4ecd5bcdc719c838fb51fc25",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/pipeline_observer.py",
+          "sha256": "ed584d2eef80dfa2b85edaa3b1cbcd54163514ef4ecd5bcdc719c838fb51fc25"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/platform/__init__.py",
+      "sha256": "957cbb71b66739755888cb342092f61e7066e8f60e2d572b919d867e7e433d85",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/platform/__init__.py",
+          "sha256": "957cbb71b66739755888cb342092f61e7066e8f60e2d572b919d867e7e433d85"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/platform/__init__.py",
+          "sha256": "957cbb71b66739755888cb342092f61e7066e8f60e2d572b919d867e7e433d85"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/platform/__main__.py",
+      "sha256": "7361376c26471d1dcccaf93ab9d4368cb70c9b0eaf6592fcdb34c8bdd825af3d",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/platform/__main__.py",
+          "sha256": "b841ba44933d55189dad8c43751cb5f1cca8e4e13c632b7a0ade699510a10ed0"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/platform/__main__.py",
+          "sha256": "a9a64dd444bc2fc99f1caa97217609c143f3bbacc5bfce3eabf5c96be16e2f75"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/platform/api.py",
+      "sha256": "29d3f508c40c1387ae25e3c6a420bf886179407fd6d8c369fda0a3c277cd87f2",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/platform/api.py",
+          "sha256": "f69e628ce64972f447b5536608bc157dbf711fdea75ee2552ccc07527481303b"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/platform/api.py",
+          "sha256": "be2718c870282f1cfb789d4b4d68fd60169839e7a1850f30e460a0ee314f6b21"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/platform/conversation_context.py",
+      "sha256": "a594ddc04e25547774f8cc28ad9eff33b965d6e73e2fc770b4900c5b8823dca4",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/platform/conversation_context.py",
+          "sha256": "a594ddc04e25547774f8cc28ad9eff33b965d6e73e2fc770b4900c5b8823dca4"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/platform/executor.py",
+      "sha256": "5392ef15798d46e60d1aca812c4ca097f34c04b1702b5725bc06991cb9db7ae9",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/platform/executor.py",
+          "sha256": "1e9274c13ecc58b0a06223eeadca68161f8b112a9ad628c23f62fe7be68b0e7f"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/platform/executor.py",
+          "sha256": "23e0d431ef31c33500e15e2fcad4fc2d3583fec9ebb93ee40d40cc992733d3ab"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/platform/requirements.txt",
+      "sha256": "99a536f65868124af4e291fa08086102eaa67ce168219e79adf0680bbf073aaf",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/platform/requirements.txt",
+          "sha256": "99a536f65868124af4e291fa08086102eaa67ce168219e79adf0680bbf073aaf"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/platform/requirements.txt",
+          "sha256": "99a536f65868124af4e291fa08086102eaa67ce168219e79adf0680bbf073aaf"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/platform/service.py",
+      "sha256": "ebde90bfdb2fe8224b85d9eeac8eea22574136571796decf9129423d98bb5850",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/platform/service.py",
+          "sha256": "aaa18c69fba260715ae8cac90e5d3ea6571f5d37c276b9b125a5a989b01e8dac"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/platform/service.py",
+          "sha256": "a90502696dec78d9ee686e7f30142278d51465d40c6d67bce97d21ece3e124c7"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/platform/store.py",
+      "sha256": "c611f6f00a855c9b269d8a3cc303f6906f6339102efb6fb6db0906e9e78b193b",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/platform/store.py",
+          "sha256": "5944ac194c5876a2fe442b1c85ec155eb2ccf2cf8e7a64c2fa9d7cfa09d26d4e"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/platform/store.py",
+          "sha256": "8b3b1d08ad11616c3221158696876d3d9924ccbcbf73d3925aa400e3ced18689"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/project_diagnosis.py",
+      "sha256": "2f47f8b7c60fe5eaf6846eb911020daf2fb4a6a80037854ac50cb95125634926",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/project_diagnosis.py",
+          "sha256": "2f47f8b7c60fe5eaf6846eb911020daf2fb4a6a80037854ac50cb95125634926"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/project_repair.py",
+      "sha256": "bfe14209e6fe750b3a36afb6d5b1e29324e9ee377544ab966c166ddc5461b4b7",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/project_repair.py",
+          "sha256": "bfe14209e6fe750b3a36afb6d5b1e29324e9ee377544ab966c166ddc5461b4b7"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/README.md",
+      "sha256": "80a8fbdeb47b14d7a69f49cfc8909b2a0bced120b475afd2cbbf40b4ffbfd695",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/README.md",
+          "sha256": "80a8fbdeb47b14d7a69f49cfc8909b2a0bced120b475afd2cbbf40b4ffbfd695"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/README.md",
+          "sha256": "f799c5f17b7acbc3d881512895ef6bc9337ebf3187f1888e4e2d7358c0492dca"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/remote_executor.py",
+      "sha256": "d88b06efe46508d0a286bcf227efb97128ae6a5275962b2929969b04dd103b2c",
+      "candidates": [
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/remote_executor.py",
+          "sha256": "8954a26100aa721b35acd904f8e2e5eab893c72fc912b5aaca42dea0da3cdcd1"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/run_validation.py",
+      "sha256": "6f6af261f29873efe0b4c276542fb43fb3416522b1fe968556b72080eb55b2ee",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/run_validation.py",
+          "sha256": "6f6af261f29873efe0b4c276542fb43fb3416522b1fe968556b72080eb55b2ee"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/run_validation.py",
+          "sha256": "b9662946bba70190a30f01fcbac68824b1fb75be2a37cda9371a70da82dfbe77"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/specs/square_and_mul.json",
+      "sha256": "91391277aa3be73ab48b3ab9498d2d899ccd73116d65f02825eaea73441b07b9",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/specs/square_and_mul.json",
+          "sha256": "91391277aa3be73ab48b3ab9498d2d899ccd73116d65f02825eaea73441b07b9"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/specs/square_and_mul.json",
+          "sha256": "91391277aa3be73ab48b3ab9498d2d899ccd73116d65f02825eaea73441b07b9"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/specs/tanh_and_mul.json",
+      "sha256": "09f2b182d1281fa953209afbd9512ceef2a6a1145a798ef6311e647def3abd90",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/specs/tanh_and_mul.json",
+          "sha256": "09f2b182d1281fa953209afbd9512ceef2a6a1145a798ef6311e647def3abd90"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/specs/tanh_and_mul.json",
+          "sha256": "09f2b182d1281fa953209afbd9512ceef2a6a1145a798ef6311e647def3abd90"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/summarize_operator_results.py",
+      "sha256": "ce96557fa8dad5ea80c866ab75637d13ad895ec38f14b527a14417271c167752",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/summarize_operator_results.py",
+          "sha256": "ce96557fa8dad5ea80c866ab75637d13ad895ec38f14b527a14417271c167752"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/summarize_operator_results.py",
+          "sha256": "e092744e968e5f81b8f3ea8b9f5223f8db36568b475858388b7191ea5d76c53b"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/test_planner.py",
+      "sha256": "f6151e2251e61ccd069c471c3b154de2da2431433a65c84f678d9b4d301bdb58",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/test_planner.py",
+          "sha256": "f6151e2251e61ccd069c471c3b154de2da2431433a65c84f678d9b4d301bdb58"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/__init__.py",
+      "sha256": "5eba1ba8f8f21e1979503adf19a037d15b2b7445266dd5eb111c108ca6fc53bf",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/__init__.py",
+          "sha256": "5eba1ba8f8f21e1979503adf19a037d15b2b7445266dd5eb111c108ca6fc53bf"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/__init__.py",
+          "sha256": "5eba1ba8f8f21e1979503adf19a037d15b2b7445266dd5eb111c108ca6fc53bf"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/fixtures/diagnosis_cases.json",
+      "sha256": "aee4a0b6d1ec4901ff823ba776006b31e174964349da978f1e8ea9dc58cb059e",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/fixtures/diagnosis_cases.json",
+          "sha256": "aee4a0b6d1ec4901ff823ba776006b31e174964349da978f1e8ea9dc58cb059e"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/fixtures/memory_retrieval_cases.json",
+      "sha256": "b08a538a30f1aee0b331f233b811e3260087e4a69fb5b453a366405fdee0fe58",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/fixtures/memory_retrieval_cases.json",
+          "sha256": "b08a538a30f1aee0b331f233b811e3260087e4a69fb5b453a366405fdee0fe58"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/fixtures/memory_retrieval_challenge.json",
+      "sha256": "88496d8c84fdc97a6fc03e6dd6bf20676e6543139304152b6b18f3949572a8e2",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/fixtures/memory_retrieval_challenge.json",
+          "sha256": "88496d8c84fdc97a6fc03e6dd6bf20676e6543139304152b6b18f3949572a8e2"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/fixtures/repository/python/examples/flaggems/relu_and_mul.py",
+      "sha256": "ef555218024f74f4c769fdd4d6365b9039fdac7c0c45a7b6343cf03571b64b43",
+      "candidates": [],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/tests/fixtures/repository/python/examples/flaggems/test_relu_and_mul.py",
+      "sha256": "8b5679486f9ce546f97b2b914e470c7e8b40fc7543158f5c6057d21168b3b4d1",
+      "candidates": [],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/tests/test_conversation_context.py",
+      "sha256": "b28f59059406e54974d26e1791e6dbd0961e5432c732c7b2d04d302e037474e9",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_conversation_context.py",
+          "sha256": "b28f59059406e54974d26e1791e6dbd0961e5432c732c7b2d04d302e037474e9"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_demo.py",
+      "sha256": "81b27746351ff9eada150d8f338d220c9dbef6532ea811bf33f17cc8bfc9a1cb",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_demo.py",
+          "sha256": "81b27746351ff9eada150d8f338d220c9dbef6532ea811bf33f17cc8bfc9a1cb"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_develop_operator.py",
+      "sha256": "ad1aa2acf0bc1cc4f8bc875f65ee2c8d2aa305fbff3e24090fb1e7fd1534e7f3",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_develop_operator.py",
+          "sha256": "ad1aa2acf0bc1cc4f8bc875f65ee2c8d2aa305fbff3e24090fb1e7fd1534e7f3"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/test_develop_operator.py",
+          "sha256": "a1dbac5fa4ecbe233cfd707268d20c40c225d30de0945fb1e4092d45ce38f3b6"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_diagnostic_memory.py",
+      "sha256": "f61d39ec68d98ad503bbdf98174bae2904be2ce30ee340829ca6551d4f097351",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_diagnostic_memory.py",
+          "sha256": "f61d39ec68d98ad503bbdf98174bae2904be2ce30ee340829ca6551d4f097351"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_discover_operators.py",
+      "sha256": "f9d2ef6d7dc8d1340c828b4721b7e649221c6118ab615e5b2096d2f8c42f9a81",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_discover_operators.py",
+          "sha256": "f9d2ef6d7dc8d1340c828b4721b7e649221c6118ab615e5b2096d2f8c42f9a81"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_discover.py",
+      "sha256": "84210018df7d3c391d7ab2ba38ea61835716122e04d7bf9c6f2a4cfc47c5ce26",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_discover.py",
+          "sha256": "84210018df7d3c391d7ab2ba38ea61835716122e04d7bf9c6f2a4cfc47c5ce26"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_embeddings.py",
+      "sha256": "8ee1997d9a16cd4c748894f12153ef8fc875798695c5e6e776a45b075966ff4c",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_embeddings.py",
+          "sha256": "8ee1997d9a16cd4c748894f12153ef8fc875798695c5e6e776a45b075966ff4c"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_evaluate_memory_modes.py",
+      "sha256": "382d28aac3f4ebbe52dcb0ed119d513faa7dae49fda2322e353390f9bec94e76",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_evaluate_memory_modes.py",
+          "sha256": "20a6d1ac0f1459bffbed0ffad40c9a95c7231fb865077b5a3129004739ae4f16"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/tests/test_failure_diagnosis.py",
+      "sha256": "ad3008afa575b7a139d3ef055fa76ed52a68adcad748de5d064cc022bf13c7ae",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_failure_diagnosis.py",
+          "sha256": "ad3008afa575b7a139d3ef055fa76ed52a68adcad748de5d064cc022bf13c7ae"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_harness.py",
+      "sha256": "ce0fe64faa2c93aa12582b50516b7750f947a99506f89f40499cbfbb82a505a1",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_harness.py",
+          "sha256": "85ac439c1802ec88e71a425070e8b237d290afd6a460658c604b28224af41f00"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/test_harness.py",
+          "sha256": "ce0fe64faa2c93aa12582b50516b7750f947a99506f89f40499cbfbb82a505a1"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_langgraph_agent.py",
+      "sha256": "687d032fe5801a52d4c7540935cec21a15e9281eff76e6d89e16d23609d865b0",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_langgraph_agent.py",
+          "sha256": "687d032fe5801a52d4c7540935cec21a15e9281eff76e6d89e16d23609d865b0"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_mcp_tools.py",
+      "sha256": "bcfc6484509a6846dbef97b876d9ec813997f3156b44b8f6587ac3c343ebc17d",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_mcp_tools.py",
+          "sha256": "0be1484c1accc1ed0e66b55b30b9fa4baee9a41b137b6ebba9f47a8b2514202d"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/test_mcp_tools.py",
+          "sha256": "c7007276d65b04f875ca732889a0bc21844cc7d19eb2ba68a3b43fa1692a54f9"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/tests/test_memory_context.py",
+      "sha256": "3986d78fcb7494589e8b34b48b8362282f898aca88d911150e00136ae63cf751",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_memory_context.py",
+          "sha256": "3986d78fcb7494589e8b34b48b8362282f898aca88d911150e00136ae63cf751"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_memory_evidence.py",
+      "sha256": "6782d3d7cb270c6ff832b60d8bf078349387946718977302b87299f8f589bc0c",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_memory_evidence.py",
+          "sha256": "6782d3d7cb270c6ff832b60d8bf078349387946718977302b87299f8f589bc0c"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_memory_retrieval_evaluation.py",
+      "sha256": "960f50badb34a63496e591466509e933f4d11cf88d55adbf631fdb955dfbd958",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_memory_retrieval_evaluation.py",
+          "sha256": "8267f21b49742cbe174a322d06f428f2a20be52b401534b53f7db35ba954bdc6"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/tests/test_memory_selection.py",
+      "sha256": "1ba15cbd306cf89a8ad94d947dea5690456aa7036310df116a230af0678a2175",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_memory_selection.py",
+          "sha256": "1ba15cbd306cf89a8ad94d947dea5690456aa7036310df116a230af0678a2175"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_memory.py",
+      "sha256": "2c80a114fbe8c6a6c045d02b7bf088470087cbc620e9cb1a57960957f8cbe877",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_memory.py",
+          "sha256": "2c80a114fbe8c6a6c045d02b7bf088470087cbc620e9cb1a57960957f8cbe877"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_model_router.py",
+      "sha256": "44a38093b420323283f00b74c2357d327a366636d3f14d7eac087172a3d9e03f",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_model_router.py",
+          "sha256": "44a38093b420323283f00b74c2357d327a366636d3f14d7eac087172a3d9e03f"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_operator_agent.py",
+      "sha256": "4eaf3f2a5ba71d4e55a41d479a87dd86778f308c9e94ea37a8700ebea823b873",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_operator_agent.py",
+          "sha256": "4eaf3f2a5ba71d4e55a41d479a87dd86778f308c9e94ea37a8700ebea823b873"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/test_operator_agent.py",
+          "sha256": "1aca14b7678c1db41f801abefd5b7a225e90a581ff85f51e8749027a16be9c04"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_operator_baseline.py",
+      "sha256": "a3bb86d3c18c51dc0a2dfc54e0149c9e61584393000f4c7a5170dd4521ba9398",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_operator_baseline.py",
+          "sha256": "a3bb86d3c18c51dc0a2dfc54e0149c9e61584393000f4c7a5170dd4521ba9398"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_operator_development.py",
+      "sha256": "8501dcd0075f2e5b6ac16644214e4a510a79f38f39f911d775b7687257025281",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_operator_development.py",
+          "sha256": "91ce4926e62b4f28c9a5c1126274a42d4872091a81b862c7e13c1b1044104e6c"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/test_operator_development.py",
+          "sha256": "8501dcd0075f2e5b6ac16644214e4a510a79f38f39f911d775b7687257025281"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_operator_lifecycle.py",
+      "sha256": "24f1c5baf4d2d502c83a60a430717efb5a6897e3806dc3340f2ab4c59c4fa885",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_operator_lifecycle.py",
+          "sha256": "507a9218ed9af130825d2cd378fc6bb6b64b778d8a9a57cfb3aba971f085a672"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/test_operator_lifecycle.py",
+          "sha256": "24f1c5baf4d2d502c83a60a430717efb5a6897e3806dc3340f2ab4c59c4fa885"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_operator_status.py",
+      "sha256": "9451b369f73a2bb9901a6ca190fb53d7baeb6d638824eb66c287cdd4d601df66",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_operator_status.py",
+          "sha256": "9451b369f73a2bb9901a6ca190fb53d7baeb6d638824eb66c287cdd4d601df66"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_pipeline_observer.py",
+      "sha256": "f2f7c3916d35e513acd0e100d949a63e169eba7201cf5e839a7ee473c78167f8",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_pipeline_observer.py",
+          "sha256": "f2f7c3916d35e513acd0e100d949a63e169eba7201cf5e839a7ee473c78167f8"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_platform_api.py",
+      "sha256": "56a18e9c761de482ca3f8ea246e86b75f074db896260b0e78f1f05857fa254c2",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_platform_api.py",
+          "sha256": "d7e7582f38601c4eaf1d5bf31b9c34cc99895f835b22163b0eaa76b21a39f8a8"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/test_platform_api.py",
+          "sha256": "56a18e9c761de482ca3f8ea246e86b75f074db896260b0e78f1f05857fa254c2"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_platform_service.py",
+      "sha256": "7efed2812e49bde349f7566834a1f194e154d1d77df7008ac2b5e844052d0b37",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_platform_service.py",
+          "sha256": "cb3717e06c0834295065873e6655531290b373c81b203a382583ff45689bb74e"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/test_platform_service.py",
+          "sha256": "7efed2812e49bde349f7566834a1f194e154d1d77df7008ac2b5e844052d0b37"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_platform_store.py",
+      "sha256": "352a639394c990c0739c294e3fd36f90147103c44d376de843e115120881da45",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_platform_store.py",
+          "sha256": "cfa82007a453a2f05423c04c6b86875a99d770dd8cb772d2a839e9ab5b209d38"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/test_platform_store.py",
+          "sha256": "352a639394c990c0739c294e3fd36f90147103c44d376de843e115120881da45"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_plugin_migration.py",
+      "sha256": "0b59369ec33e5b593e4961ff2d3049232001b014fc6ef4cc8e43ca6f0aaed460",
+      "candidates": [],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/tests/test_project_diagnosis.py",
+      "sha256": "3f51e00441b6d3cf044baf4badfb2080d627025d9bc1508fde9a9f2abf96bfc3",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_project_diagnosis.py",
+          "sha256": "3f51e00441b6d3cf044baf4badfb2080d627025d9bc1508fde9a9f2abf96bfc3"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_remote_executor.py",
+      "sha256": "711f8b8762e5144de863bd2633cc96379a0cd2dbe7242cb004f6b22ef9498a21",
+      "candidates": [
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/test_remote_executor.py",
+          "sha256": "711f8b8762e5144de863bd2633cc96379a0cd2dbe7242cb004f6b22ef9498a21"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_run_validation.py",
+      "sha256": "a976c0763e82abc0ae65766ad94823d6a9edc550ed41a38734d21b7442f1dc9c",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_run_validation.py",
+          "sha256": "a976c0763e82abc0ae65766ad94823d6a9edc550ed41a38734d21b7442f1dc9c"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_summarize_operator_results.py",
+      "sha256": "3e318964d8fb142461052706721449030ffa87a3506ff220ad16e13a95c56456",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_summarize_operator_results.py",
+          "sha256": "3e318964d8fb142461052706721449030ffa87a3506ff220ad16e13a95c56456"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/test_summarize_operator_results.py",
+          "sha256": "3e318964d8fb142461052706721449030ffa87a3506ff220ad16e13a95c56456"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_test_planner.py",
+      "sha256": "7abc001fc8ba334a7b227ebb24d0f98b8da2d4c7e73aaa3f5c937aeb9fea5559",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_test_planner.py",
+          "sha256": "7abc001fc8ba334a7b227ebb24d0f98b8da2d4c7e73aaa3f5c937aeb9fea5559"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_validate_operator.py",
+      "sha256": "bb0e53ee9b2803eae289d55aa78af44c2cd2d557f4acdc735f1babee22301028",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_validate_operator.py",
+          "sha256": "bb0e53ee9b2803eae289d55aa78af44c2cd2d557f4acdc735f1babee22301028"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/test_validate_operator.py",
+          "sha256": "4a0f09ae1b1e2de64cdaf3b87e626959dff3a7db94184779264eb8cdc3505673"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_validation_evidence.py",
+      "sha256": "d83890c740eac2e533b71f39f3721dcf3b4dfe4a9cf1a25a4fcb0758f52f3388",
+      "candidates": [
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/tests/test_validation_evidence.py",
+          "sha256": "d83890c740eac2e533b71f39f3721dcf3b4dfe4a9cf1a25a4fcb0758f52f3388"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/tests/test_workflow.py",
+      "sha256": "fee08ba19e6725a560a2aac2349517531845f2568bdd80964db6f01c6594ac5f",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/tests/test_workflow.py",
+          "sha256": "fee08ba19e6725a560a2aac2349517531845f2568bdd80964db6f01c6594ac5f"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    },
+    {
+      "path": "python/codex_agent/validate_operator.py",
+      "sha256": "b340a0180793bf229ff2b19bcff322ed938b7bc3982111d2094f172dadd98a8a",
+      "candidates": [
+        {
+          "source": "rag_workspace",
+          "path": "codex_agent/validate_operator.py",
+          "sha256": "5bfe641ad41aa36d36dcef060751a1cac642d2146534a52003439cfd741e1330"
+        },
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/validate_operator.py",
+          "sha256": "42f4c621981fa871dc32f74e2ff32e8a12ee324fbf9e0d967aa27f0ca357f830"
+        }
+      ],
+      "disposition": "integration-change-or-new"
+    },
+    {
+      "path": "python/codex_agent/validation_evidence.py",
+      "sha256": "9226f98913a82af494f59e0316095ede1b97447f528ad9258ada2906b25e6d2a",
+      "candidates": [
+        {
+          "source": "live_workbench",
+          "path": "codex_agent/validation_evidence.py",
+          "sha256": "9226f98913a82af494f59e0316095ede1b97447f528ad9258ada2906b25e6d2a"
+        }
+      ],
+      "disposition": "unchanged-copy"
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+# Triton-RISCV composition for deepseek-harness-sdk 0.1.1rc1.
+# Keep the SDK JSON-RPC server: the Python client communicates through it.
+- id: sdk-jsonrpc-server
+  name: '@deepseek-ai/dsh-sdk-jsonrpc-server'
+
+- id: agent-core
+  name: '@deepseek-ai/dsh-agent-spine-demo'
+  config:
+    workspaceContext:
+      maxBytes: 65536
+
+- id: llm-isrc
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      isrc-proxy:
+        displayName: ISRC Responses Proxy
+        apiKeyEnv: !!js process.env.DSH_API_KEY_ENV ?? 'ISRC_API_KEY'
+        api: openai-responses
+        baseURL: !!js process.env.ISRC_BASE_URL ?? 'https://llmapi.isrc.ac.cn/v1'
+        models:
+          - id: !!js process.env.DSH_MODEL ?? 'gpt-5.6-sol'
+            name: !!js process.env.DSH_MODEL ?? 'gpt-5.6-sol'
+
+- id: sessions
+  name: '@deepseek-ai/dsh-session-persistence-jsonl'
+  config:
+    root: !!js process.env.DSH_SESSION_ROOT ?? './.sessions'
+
+- id: session-checkpoints
+  name: '@deepseek-ai/dsh-session-checkpoint-policy'
+
+- id: subprocess
+  name: '@deepseek-ai/dsh-subprocess-local'
+
+- id: bash
+  name: '@deepseek-ai/dsh-bash-local'
+  config:
+    cwd: !!js process.env.DSH_CWD ?? process.cwd()
+
+- id: fs-local
+  name: '@deepseek-ai/dsh-fs-local'
+  config:
+    cwd: !!js process.env.DSH_CWD ?? process.cwd()
+
+# The local demo platform mounts the same domain-policy module distributed by
+# the installable dsh-triton-riscv bundle.
+- id: triton-riscv-domain-policy
+  name: './bundle/index.js'
+
+# The Harness MCP client launches our Python server and registers its tools as
+# mcp__triton_riscv__<tool-name> model-facing functions.
+- id: mcp-triton-riscv
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: triton_riscv
+    transport: stdio
+    command: !!js process.env.TRITON_RISCV_MCP_PYTHON
+    args: ['-I', '-m', 'codex_agent.harness.mcp_server']
+    env:
+      TRITON_RISCV_REPO_ROOT: !!js process.env.DSH_CWD ?? process.cwd()
+      TRITON_RISCV_ALLOW_VALIDATION: !!js process.env.TRITON_RISCV_ALLOW_VALIDATION ?? '0'
+      TRITON_RISCV_ALLOW_REPAIR_APPLY: !!js process.env.TRITON_RISCV_ALLOW_REPAIR_APPLY ?? '0'
+      TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY: !!js process.env.TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY ?? '0'
+      TRITON_RISCV_REQUIRE_REMOTE: !!js process.env.TRITON_RISCV_REQUIRE_REMOTE ?? '0'
+      TRITON_RISCV_REQUIRE_APPROVED_VALIDATION: !!js process.env.TRITON_RISCV_REQUIRE_APPROVED_VALIDATION ?? '1'
+      RISCV_HOST: !!js process.env.RISCV_HOST ?? ''
+      RISCV_REPO: !!js process.env.RISCV_REPO ?? ''
+    cwd: !!js process.env.DSH_CWD ?? process.cwd()
+    # A real Triton-RISCV compile/test commonly exceeds 30 seconds.
+    toolCallTimeoutMs: 960000
+    failOnStartupError: true

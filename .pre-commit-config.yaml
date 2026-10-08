@@ -6,6 +6,12 @@ repos:
       - id: trailing-whitespace
       - id: check-merge-conflict
       - id: check-yaml
+        exclude: ^packages/dsh-triton-riscv/python/codex_agent/harness/cordis\.yml$
+      # The retained SDK demo uses Harness's !!js tags. Parse only; never execute.
+      - id: check-yaml
+        alias: check-harness-sdk-yaml
+        args: [--unsafe]
+        files: ^packages/dsh-triton-riscv/python/codex_agent/harness/cordis\.yml$
       - id: check-json
       - id: check-added-large-files
 

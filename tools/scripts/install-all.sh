@@ -27,7 +27,7 @@ pnpm run build
 # ===------------------------------------------------------===#
 for pkg in "$ROOT"/packages/*/; do
   if [ -f "$pkg/package.json" ]; then
-    (cd "$pkg" && pnpm install --frozen-lockfile && pnpm build)
+    (cd "$pkg" && pnpm install --frozen-lockfile && pnpm build && pnpm run --if-present setup:backend)
   fi
 done
 

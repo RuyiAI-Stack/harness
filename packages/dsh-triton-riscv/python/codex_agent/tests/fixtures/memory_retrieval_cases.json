@@ -1,0 +1,206 @@
+{
+  "corpus": [
+    {
+      "memory_type": "successful-repair",
+      "operator": "tanh_and_mul",
+      "semantics": "Compute tanh of x and multiply by y elementwise.",
+      "pytorch_reference": "torch.tanh(x) * y",
+      "summary": "Replaced an expression that left linalg.generic before LLVM translation with supported primitives.",
+      "outcome": "passed",
+      "confidence_grade": "A",
+      "source_run": "case:linalg-repair",
+      "tl_ops": ["exp", "load", "store"],
+      "failure_stage": "mlir-translate",
+      "evidence": { "error_excerpt": ["Dialect linalg not found for linalg.generic"] }
+    },
+    {
+      "memory_type": "successful-repair",
+      "operator": "masked_select",
+      "semantics": "Select elements through a boolean mask with safe boundary offsets.",
+      "pytorch_reference": "torch.masked_select(x, mask)",
+      "summary": "Corrected pointer mask and offset handling that caused an out of bounds runtime crash.",
+      "outcome": "passed",
+      "confidence_grade": "A",
+      "source_run": "case:pointer-mask",
+      "tl_ops": ["load", "store", "where"],
+      "failure_stage": "runtime",
+      "evidence": { "error_excerpt": ["segmentation fault after masked load"] }
+    },
+    {
+      "memory_type": "successful-repair",
+      "operator": "softsign",
+      "semantics": "Compute x divided by one plus absolute x.",
+      "pytorch_reference": "torch.nn.functional.softsign(x)",
+      "summary": "Used supported Triton primitives after a missing triton.language.math API error.",
+      "outcome": "passed",
+      "confidence_grade": "B",
+      "source_run": "case:missing-math-api",
+      "tl_ops": ["abs", "load", "store"],
+      "failure_stage": "triton-frontend",
+      "evidence": { "error_excerpt": ["triton.language.math has no attribute softsign"] }
+    },
+    {
+      "memory_type": "failure-diagnosis",
+      "operator": "fp8_matmul",
+      "semantics": "Multiply matrices whose input contract requests FP8 values.",
+      "pytorch_reference": "torch.matmul(x, y)",
+      "summary": "The RISC-V target does not support the requested FP8 dtype.",
+      "outcome": "failed",
+      "confidence_grade": "C",
+      "source_run": "case:fp8-capability",
+      "tl_ops": ["dot", "load", "store"],
+      "failure_stage": "target-capability",
+      "evidence": { "error_excerpt": ["fp8 is not supported in this architecture"] }
+    },
+    {
+      "memory_type": "failure-diagnosis",
+      "operator": "sum",
+      "semantics": "Reduce all values along one dimension.",
+      "pytorch_reference": "torch.sum(x, dim=dim)",
+      "summary": "Buddy lowering rejected an unsupported linalg.reduce operation.",
+      "outcome": "failed",
+      "confidence_grade": "C",
+      "source_run": "case:buddy-reduce",
+      "tl_ops": ["sum", "load", "store"],
+      "failure_stage": "buddy-opt",
+      "evidence": { "error_excerpt": ["unsupported linalg.reduce"] }
+    },
+    {
+      "memory_type": "failure-diagnosis",
+      "operator": "dependency_probe",
+      "semantics": "Import and initialize the numerical reference dependencies.",
+      "pytorch_reference": "torch.tensor(x)",
+      "summary": "Python could not import numpy in the selected validation environment.",
+      "outcome": "failed",
+      "confidence_grade": "C",
+      "source_run": "case:python-import",
+      "tl_ops": [],
+      "failure_stage": "import",
+      "evidence": { "error_excerpt": ["ModuleNotFoundError: No module named numpy"] }
+    },
+    {
+      "memory_type": "failure-diagnosis",
+      "operator": "large_sort",
+      "semantics": "Sort a large tensor along its final dimension.",
+      "pytorch_reference": "torch.sort(x)",
+      "summary": "Validation exceeded the configured command timeout before pytest completed.",
+      "outcome": "failed",
+      "confidence_grade": "C",
+      "source_run": "case:timeout",
+      "tl_ops": ["load", "store"],
+      "failure_stage": "timeout",
+      "evidence": { "error_excerpt": ["TIMEOUT after 900 seconds"] }
+    },
+    {
+      "memory_type": "successful-repair",
+      "operator": "sigmoid_and_mul",
+      "semantics": "Compute sigmoid activation and multiply by a second tensor.",
+      "pytorch_reference": "torch.sigmoid(x) * y",
+      "summary": "Corrected the elementwise expression after numerical values differed from the PyTorch reference.",
+      "outcome": "passed",
+      "confidence_grade": "A",
+      "source_run": "case:numerical-repair",
+      "tl_ops": ["exp", "load", "store"],
+      "failure_stage": "correctness",
+      "evidence": { "error_excerpt": ["mismatched elements and maximum difference"] }
+    }
+  ],
+  "queries": [
+    {
+      "id": "cross-operator-linalg",
+      "query": {
+        "operator": "new_activation",
+        "semantics": "Compute an activation using exponential primitives.",
+        "pytorch_reference": "torch.tanh(x)",
+        "tl_ops": ["exp", "load", "store"],
+        "failure_stage": "mlir-translate",
+        "diagnostic_text": "Dialect linalg not found for linalg.generic"
+      },
+      "expected_source_run": "case:linalg-repair"
+    },
+    {
+      "id": "pointer-mask-runtime",
+      "query": {
+        "operator": "masked_gather",
+        "semantics": "Read values through a boolean mask and boundary offsets.",
+        "pytorch_reference": "torch.where(mask, x, 0)",
+        "tl_ops": ["load", "where"],
+        "failure_stage": "runtime",
+        "diagnostic_text": "segmentation fault after masked load"
+      },
+      "expected_source_run": "case:pointer-mask"
+    },
+    {
+      "id": "frontend-api",
+      "query": {
+        "operator": "softsign",
+        "semantics": "Compute x divided by one plus absolute x.",
+        "pytorch_reference": "torch.nn.functional.softsign(x)",
+        "tl_ops": ["abs", "load", "store"],
+        "failure_stage": "triton-frontend",
+        "diagnostic_text": "triton.language.math has no attribute softsign"
+      },
+      "expected_source_run": "case:missing-math-api"
+    },
+    {
+      "id": "hardware-fp8",
+      "query": {
+        "operator": "quantized_dot",
+        "semantics": "Multiply matrices with FP8 inputs.",
+        "pytorch_reference": "torch.matmul(x, y)",
+        "tl_ops": ["dot"],
+        "failure_stage": "target-capability",
+        "diagnostic_text": "fp8 is not supported in this architecture"
+      },
+      "expected_source_run": "case:fp8-capability"
+    },
+    {
+      "id": "buddy-reduction",
+      "query": {
+        "operator": "mean",
+        "semantics": "Reduce tensor values along one dimension.",
+        "pytorch_reference": "torch.mean(x, dim=dim)",
+        "tl_ops": ["sum", "load"],
+        "failure_stage": "buddy-opt",
+        "diagnostic_text": "unsupported linalg.reduce"
+      },
+      "expected_source_run": "case:buddy-reduce"
+    },
+    {
+      "id": "environment-import",
+      "query": {
+        "operator": "environment_check",
+        "semantics": "Initialize numerical dependencies before validation.",
+        "pytorch_reference": "torch.tensor(x)",
+        "tl_ops": [],
+        "failure_stage": "import",
+        "diagnostic_text": "ModuleNotFoundError No module named numpy"
+      },
+      "expected_source_run": "case:python-import"
+    },
+    {
+      "id": "validation-timeout",
+      "query": {
+        "operator": "topk",
+        "semantics": "Process a very large tensor before pytest completes.",
+        "pytorch_reference": "torch.topk(x, k)",
+        "tl_ops": ["load", "store"],
+        "failure_stage": "timeout",
+        "diagnostic_text": "TIMEOUT after 900 seconds"
+      },
+      "expected_source_run": "case:timeout"
+    },
+    {
+      "id": "numerical-correctness",
+      "query": {
+        "operator": "scaled_sigmoid",
+        "semantics": "Compute sigmoid elementwise and combine it with another tensor.",
+        "pytorch_reference": "torch.sigmoid(x) * y",
+        "tl_ops": ["exp", "load", "store"],
+        "failure_stage": "correctness",
+        "diagnostic_text": "mismatched elements and maximum difference"
+      },
+      "expected_source_run": "case:numerical-repair"
+    }
+  ]
+}

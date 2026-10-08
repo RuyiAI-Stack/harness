@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dsh-triton-riscv-agent"
+version = "0.1.0"
+description = "Triton-RISCV domain tools, evidence memory and workbench for DeepSeek Harness"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+dependencies = ["pydantic>=2.11,<3", "mcp==2.1.1", "fastapi>=0.115", "httpx>=0.28", "uvicorn>=0.34", "pytest>=8,<10"]
+
+[project.optional-dependencies]
+workbench = ["deepseek-harness-sdk==0.1.1rc1", "openai>=2,<3"]
+embedding = ["sentence-transformers>=3", "tokenizers>=0.20", "openai>=2,<3"]
+
+[project.scripts]
+triton-riscv-workbench = "codex_agent.platform.__main__:main"
+triton-riscv-mcp = "codex_agent.harness.mcp_server:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["codex_agent*"]
+namespaces = true
+
+[tool.pytest.ini_options]
+testpaths = ["codex_agent/tests"]
+norecursedirs = ["fixtures"]
+
+[tool.setuptools.package-data]
+codex_agent = ["*.json", "README.md", "specs/*.json", "tests/fixtures/*.json", "harness/*.yml", "harness/bundle/*", "harness/bundle/lib/*.js", "harness/bundle/prompts/*.md", "frontend/dist/*", "frontend/dist/assets/*"]

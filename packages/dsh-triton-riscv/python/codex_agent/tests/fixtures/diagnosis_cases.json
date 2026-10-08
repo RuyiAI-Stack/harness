@@ -1,0 +1,220 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "environment-helper-missing",
+      "exit_code": 1,
+      "log": "scripts/triton-riscv-env.sh: line 27: cd: No such file or directory",
+      "expected_rule_id": "environment-helper-missing",
+      "expected_stage": "environment",
+      "expected_category": "environment",
+      "evidence_contains": "triton-riscv-env.sh"
+    },
+    {
+      "id": "python-import-failed",
+      "exit_code": 1,
+      "log": "ModuleNotFoundError: No module named 'triton'",
+      "expected_rule_id": "python-import-failed",
+      "expected_stage": "import",
+      "expected_category": "dependency",
+      "evidence_contains": "ModuleNotFoundError"
+    },
+    {
+      "id": "triton-wheel-build-failed",
+      "exit_code": 1,
+      "log": "ERROR: Failed building wheel for triton",
+      "expected_rule_id": "triton-wheel-build-failed",
+      "expected_stage": "build",
+      "expected_category": "dependency",
+      "evidence_contains": "Failed building wheel"
+    },
+    {
+      "id": "fp8-target-unsupported",
+      "exit_code": 1,
+      "log": "ValueError: type fp8e4nv not supported in this architecture",
+      "expected_rule_id": "fp8-target-unsupported",
+      "expected_stage": "target-capability",
+      "expected_category": "target-capability",
+      "evidence_contains": "fp8e4nv"
+    },
+    {
+      "id": "triton-math-api-missing",
+      "exit_code": 1,
+      "log": "triton.compiler.errors.CompilationError\nAttributeError: module triton.language.math has no attribute acos",
+      "expected_rule_id": "triton-math-api-missing",
+      "expected_stage": "triton-frontend",
+      "expected_category": "compiler-api",
+      "evidence_contains": "has no attribute acos"
+    },
+    {
+      "id": "triton-frontend-compilation",
+      "exit_code": 1,
+      "log": "triton.compiler.errors.CompilationError: at 12:4 unsupported operand",
+      "expected_rule_id": "triton-frontend-compilation",
+      "expected_stage": "triton-frontend",
+      "expected_category": "compiler-frontend",
+      "evidence_contains": "CompilationError"
+    },
+    {
+      "id": "buddy-tptr-dialect-missing",
+      "exit_code": 1,
+      "log": "ll.mlir:12:5: error: Dialect `tptr' not found for custom op 'tptr.type_offset'",
+      "expected_rule_id": "buddy-tptr-dialect-missing",
+      "expected_stage": "buddy-opt",
+      "expected_category": "compiler-capability",
+      "evidence_contains": "Dialect `tptr'"
+    },
+    {
+      "id": "buddy-ttx-dialect-missing",
+      "exit_code": 1,
+      "log": "ll.mlir:8:3: error: Dialect `ttx' not found for custom op 'ttx.cumsum'",
+      "expected_rule_id": "buddy-ttx-dialect-missing",
+      "expected_stage": "buddy-opt",
+      "expected_category": "compiler-capability",
+      "evidence_contains": "Dialect `ttx'"
+    },
+    {
+      "id": "buddy-linalg-reduce-unsupported",
+      "exit_code": 1,
+      "log": "error: unsupported linalg.reduce for -lower-linalg-to-vir",
+      "expected_rule_id": "buddy-linalg-reduce-unsupported",
+      "expected_stage": "buddy-opt",
+      "expected_category": "compiler-capability",
+      "evidence_contains": "linalg.reduce"
+    },
+    {
+      "id": "pointer-sequence-unsupported",
+      "exit_code": 1,
+      "log": "error: unexpected op in ptr sequence: arith.select",
+      "expected_rule_id": "pointer-sequence-unsupported",
+      "expected_stage": "triton-shared-opt",
+      "expected_category": "compiler-capability",
+      "evidence_contains": "unexpected op in ptr sequence"
+    },
+    {
+      "id": "unlowered-linalg-translation",
+      "exit_code": 1,
+      "log": "/tmp/tmp9anrzs_n/ll.mlir:342:5: error: Dialect `linalg' not found for custom op 'linalg.generic'",
+      "expected_rule_id": "unlowered-linalg-translation",
+      "expected_stage": "mlir-translate",
+      "expected_category": "compiler-capability",
+      "evidence_contains": "linalg.generic"
+    },
+    {
+      "id": "triton-shared-generic",
+      "exit_code": 1,
+      "log": "triton-shared-opt: error: failed to legalize operation tt.load",
+      "expected_rule_id": "triton-shared-generic",
+      "expected_stage": "triton-shared-opt",
+      "expected_category": "compiler-lowering",
+      "evidence_contains": "triton-shared-opt"
+    },
+    {
+      "id": "buddy-lowering-generic",
+      "exit_code": 1,
+      "log": "buddy-opt: error: failed to legalize operation vector.transfer_read",
+      "expected_rule_id": "buddy-lowering-generic",
+      "expected_stage": "buddy-opt",
+      "expected_category": "compiler-lowering",
+      "evidence_contains": "buddy-opt"
+    },
+    {
+      "id": "mlir-translation-generic",
+      "exit_code": 1,
+      "log": "mlir-translate: error: could not translate operation",
+      "stage_events": [
+        {
+          "stage": "mlir-translate",
+          "status": "failed",
+          "command": ["mlir-translate", "--mlir-to-llvmir", "ll.mlir"]
+        }
+      ],
+      "expected_rule_id": "mlir-translation-generic",
+      "expected_stage": "mlir-translate",
+      "expected_category": "compiler-lowering",
+      "evidence_contains": "mlir-translate"
+    },
+    {
+      "id": "llvm-codegen-generic",
+      "exit_code": 1,
+      "log": "llc: error: unable to legalize instruction",
+      "expected_rule_id": "llvm-codegen-generic",
+      "expected_stage": "llc",
+      "expected_category": "compiler-codegen",
+      "evidence_contains": "llc"
+    },
+    {
+      "id": "linker-failed",
+      "exit_code": 1,
+      "log": "ld: undefined reference to __triton_runtime_barrier",
+      "expected_rule_id": "linker-failed",
+      "expected_stage": "link",
+      "expected_category": "linker",
+      "evidence_contains": "undefined reference"
+    },
+    {
+      "id": "illegal-instruction",
+      "exit_code": 132,
+      "log": "Illegal instruction (core dumped)",
+      "expected_rule_id": "illegal-instruction",
+      "expected_stage": "target-capability",
+      "expected_category": "target-capability",
+      "evidence_contains": "Illegal instruction"
+    },
+    {
+      "id": "runtime-crash",
+      "exit_code": 139,
+      "log": "Segmentation fault while executing kernel",
+      "expected_rule_id": "runtime-crash",
+      "expected_stage": "runtime",
+      "expected_category": "runtime",
+      "evidence_contains": "Segmentation fault"
+    },
+    {
+      "id": "numerical-mismatch",
+      "exit_code": 1,
+      "log": "torch.testing.assert_close failed: Mismatched elements: 5 / 10",
+      "expected_rule_id": "numerical-mismatch",
+      "expected_stage": "correctness",
+      "expected_category": "correctness",
+      "evidence_contains": "Mismatched elements"
+    },
+    {
+      "id": "subprocess-compilation-failed",
+      "exit_code": 1,
+      "log": "subprocess.CalledProcessError: command returned non-zero exit status 1",
+      "expected_rule_id": "subprocess-compilation-failed",
+      "expected_stage": "compilation",
+      "expected_category": "compiler",
+      "evidence_contains": "CalledProcessError"
+    },
+    {
+      "id": "pytest-failed",
+      "exit_code": 1,
+      "log": "FAILED python/examples/flaggems/test_add.py::test_add\n1 failed in 2.1s",
+      "expected_rule_id": "pytest-failed",
+      "expected_stage": "pytest",
+      "expected_category": "test",
+      "evidence_contains": "FAILED"
+    },
+    {
+      "id": "validation-timeout",
+      "exit_code": 124,
+      "log": "partial compiler output\nTIMEOUT after 900 seconds",
+      "validation_command": "python -m pytest test_slow.py",
+      "expected_rule_id": "validation-timeout",
+      "expected_stage": "timeout",
+      "expected_category": "timeout",
+      "evidence_contains": "TIMEOUT"
+    },
+    {
+      "id": "unknown-nonzero-exit",
+      "exit_code": 2,
+      "log": "process stopped with an undocumented status",
+      "expected_rule_id": "unknown-nonzero-exit",
+      "expected_stage": "unknown",
+      "expected_category": "unknown",
+      "evidence_contains": "undocumented status"
+    }
+  ]
+}

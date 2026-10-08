@@ -1,0 +1,283 @@
+{
+  "description": "Synthetic challenge set for lexical, chunk embedding, and fusion ablation; not a production success-rate estimate.",
+  "corpus": [
+    {
+      "memory_type": "successful-repair",
+      "operator": "tanh_and_mul",
+      "semantics": "Hyperbolic tangent activation multiplied elementwise by another tensor.",
+      "pytorch_reference": "torch.tanh(x) * y",
+      "summary": "An unlowered structured operation reached LLVM translation; an equivalent expression using supported Triton primitives removed linalg.generic.",
+      "outcome": "passed",
+      "confidence_grade": "A",
+      "source_run": "case:riscv22-linalg",
+      "failure_stage": "mlir-translate",
+      "tl_ops": ["exp", "load", "store"],
+      "environment": { "architecture": "riscv64", "triton": "3.4.0", "llvm": "22", "buddy": "22" },
+      "evidence": { "error_excerpt": ["Dialect linalg not found for linalg.generic"] }
+    },
+    {
+      "memory_type": "successful-repair",
+      "operator": "simd_activation",
+      "semantics": "Vectorized nonlinear activation on x86 hardware.",
+      "pytorch_reference": "torch.tanh(x)",
+      "summary": "Dialect linalg not found for linalg.generic; the newer x86 compiler pipeline registered a missing dialect.",
+      "outcome": "passed",
+      "confidence_grade": "A",
+      "source_run": "case:x86-new-linalg",
+      "failure_stage": "mlir-translate",
+      "tl_ops": ["exp", "load", "store"],
+      "environment": { "architecture": "x86_64", "triton": "3.6.0", "llvm": "24", "buddy": "24" },
+      "evidence": { "error_excerpt": ["Dialect linalg not found for linalg.generic"] }
+    },
+    {
+      "memory_type": "successful-repair",
+      "operator": "masked_gather",
+      "semantics": "Gather tensor elements under a predicate with a partial final block.",
+      "pytorch_reference": "torch.where(mask, x, 0)",
+      "summary": "Out-of-bounds pointer lanes were read because the tail predicate was missing from tl.load; add a boundary mask to memory access.",
+      "outcome": "passed",
+      "confidence_grade": "A",
+      "source_run": "case:pointer-bounds",
+      "failure_stage": "runtime",
+      "tl_ops": ["load", "where", "store"],
+      "environment": { "architecture": "riscv64", "triton": "3.4.0" },
+      "evidence": { "error_excerpt": ["segmentation fault in masked load"] }
+    },
+    {
+      "memory_type": "successful-run",
+      "operator": "masked_fill",
+      "semantics": "Select replacement values with a boolean tensor.",
+      "pytorch_reference": "torch.where(mask, replacement, x)",
+      "summary": "Logical predicate selection returned the expected values; no pointer access failure occurred.",
+      "outcome": "passed",
+      "confidence_grade": "A",
+      "source_run": "case:mask-value",
+      "failure_stage": "correctness",
+      "tl_ops": ["load", "where", "store"],
+      "environment": { "architecture": "riscv64", "triton": "3.4.0" }
+    },
+    {
+      "memory_type": "successful-repair",
+      "operator": "softsign",
+      "semantics": "Normalize x by one plus its absolute magnitude.",
+      "pytorch_reference": "torch.nn.functional.softsign(x)",
+      "summary": "The named Triton math helper does not exist; express softsign with division and tl.abs instead of importing a missing attribute.",
+      "outcome": "passed",
+      "confidence_grade": "B",
+      "source_run": "case:missing-api",
+      "failure_stage": "triton-frontend",
+      "tl_ops": ["abs", "load", "store"],
+      "environment": { "architecture": "riscv64", "triton": "3.4.0" },
+      "evidence": { "error_excerpt": ["AttributeError: triton.language.math has no attribute softsign"] }
+    },
+    {
+      "memory_type": "failure-diagnosis",
+      "operator": "dependency_probe",
+      "semantics": "Import Python dependencies needed by the numerical reference.",
+      "pytorch_reference": "torch.tensor(x)",
+      "summary": "The NumPy module was absent from the validation Python environment; this is an environment issue, not an operator source bug.",
+      "outcome": "failed",
+      "confidence_grade": "C",
+      "source_run": "case:missing-numpy",
+      "failure_stage": "import",
+      "environment": { "architecture": "riscv64", "triton": "3.4.0" },
+      "evidence": { "error_excerpt": ["ModuleNotFoundError: No module named numpy"] }
+    },
+    {
+      "memory_type": "failure-diagnosis",
+      "operator": "fp8_matmul",
+      "semantics": "Matrix multiplication with FP8 operands.",
+      "pytorch_reference": "torch.matmul(x, y)",
+      "summary": "The target does not provide the requested eight-bit floating-point capability; changing the operator expression cannot add hardware support.",
+      "outcome": "failed",
+      "confidence_grade": "C",
+      "source_run": "case:fp8-hardware",
+      "failure_stage": "target-capability",
+      "tl_ops": ["dot", "load", "store"],
+      "environment": { "architecture": "riscv64", "triton": "3.4.0" },
+      "evidence": { "error_excerpt": ["fp8 is not supported in this architecture"] }
+    },
+    {
+      "memory_type": "successful-repair",
+      "operator": "sigmoid_and_mul",
+      "semantics": "Apply a logistic activation and multiply by a second tensor.",
+      "pytorch_reference": "torch.sigmoid(x) * y",
+      "summary": "Half-precision exponential intermediates amplified numerical error; compute the nonlinear expression in float32 and cast back at the output.",
+      "outcome": "passed",
+      "confidence_grade": "A",
+      "source_run": "case:half-precision",
+      "failure_stage": "correctness",
+      "tl_ops": ["exp", "load", "store"],
+      "environment": { "architecture": "riscv64", "triton": "3.4.0" },
+      "evidence": { "error_excerpt": ["float16 maximum absolute difference exceeded tolerance"] }
+    },
+    {
+      "memory_type": "failed-repair",
+      "operator": "large_sort",
+      "semantics": "Sort a very large tensor on the final dimension.",
+      "pytorch_reference": "torch.sort(x)",
+      "summary": "A source rewrite did not resolve the validation command timeout; the compile job still exceeded the time budget.",
+      "outcome": "failed",
+      "confidence_grade": "C",
+      "source_run": "case:compile-timeout",
+      "failure_stage": "timeout",
+      "tl_ops": ["load", "store"],
+      "environment": { "architecture": "riscv64", "triton": "3.4.0" },
+      "evidence": { "error_excerpt": ["TIMEOUT after 900 seconds"] }
+    },
+    {
+      "memory_type": "failure-diagnosis",
+      "operator": "reduce_sum",
+      "semantics": "Sum tensor values across one axis.",
+      "pytorch_reference": "torch.sum(x, dim=dim)",
+      "summary": "Buddy conversion rejected an unsupported structured reduction operation before LLVM IR translation.",
+      "outcome": "failed",
+      "confidence_grade": "C",
+      "source_run": "case:buddy-reduce",
+      "failure_stage": "buddy-opt",
+      "tl_ops": ["sum", "load", "store"],
+      "environment": { "architecture": "riscv64", "triton": "3.4.0", "buddy": "22" },
+      "evidence": { "error_excerpt": ["unsupported linalg.reduce"] }
+    },
+    {
+      "memory_type": "successful-repair",
+      "operator": "broadcast_mul",
+      "semantics": "Multiply inputs with broadcasting over the trailing dimension.",
+      "pytorch_reference": "torch.mul(x, y)",
+      "summary": "Incorrect index arithmetic read the wrong broadcast row; use the zero stride for singleton axes.",
+      "outcome": "passed",
+      "confidence_grade": "A",
+      "source_run": "case:broadcast-index",
+      "failure_stage": "correctness",
+      "tl_ops": ["load", "store"],
+      "environment": { "architecture": "riscv64", "triton": "3.4.0" },
+      "evidence": { "error_excerpt": ["shape mismatch in broadcast output"] }
+    },
+    {
+      "memory_type": "failed-repair",
+      "operator": "cuda_pointer_patch",
+      "semantics": "Repair pointer arithmetic on a CUDA GPU.",
+      "pytorch_reference": "torch.where(mask, x, 0)",
+      "summary": "A GPU-specific address-space cast was proposed for a masked pointer crash; it does not apply to the RISC-V CPU backend.",
+      "outcome": "failed",
+      "confidence_grade": "C",
+      "source_run": "case:cuda-pointer",
+      "failure_stage": "runtime",
+      "tl_ops": ["load", "where", "store"],
+      "environment": { "architecture": "cuda", "triton": "3.6.0" },
+      "evidence": { "error_excerpt": ["segmentation fault in masked load"] }
+    }
+  ],
+  "queries": [
+    {
+      "id": "linalg-literal",
+      "query": {
+        "operator": "new_activation",
+        "semantics": "Hyperbolic tangent of input values.",
+        "pytorch_reference": "torch.tanh(x)",
+        "failure_stage": "mlir-translate",
+        "diagnostic_text": "Dialect linalg not found for linalg.generic",
+        "environment": { "architecture": "riscv64", "triton": "3.4.0", "llvm": "22", "buddy": "22" }
+      },
+      "relevance": { "case:riscv22-linalg": 3, "case:x86-new-linalg": 1 },
+      "unsafe_source_runs": ["case:x86-new-linalg"]
+    },
+    {
+      "id": "linalg-paraphrase",
+      "query": {
+        "operator": "new_activation",
+        "semantics": "Smooth nonlinear activation using exponentials.",
+        "pytorch_reference": "torch.tanh(x)",
+        "diagnostic_text": "Structured MLIR op survived until LLVM conversion and the translator rejected it",
+        "environment": { "architecture": "riscv64", "llvm": "22" }
+      },
+      "relevance": { "case:riscv22-linalg": 3, "case:x86-new-linalg": 1 },
+      "unsafe_source_runs": ["case:x86-new-linalg"]
+    },
+    {
+      "id": "pointer-paraphrase",
+      "query": {
+        "operator": "conditional_gather",
+        "semantics": "Load selected tensor elements with a short final tile.",
+        "pytorch_reference": "torch.where(mask, x, 0)",
+        "diagnostic_text": "Access violation from inactive lanes in the final vector block",
+        "environment": { "architecture": "riscv64", "triton": "3.4.0" }
+      },
+      "relevance": { "case:pointer-bounds": 3, "case:mask-value": 1, "case:cuda-pointer": 1 },
+      "unsafe_source_runs": ["case:cuda-pointer"]
+    },
+    {
+      "id": "frontend-paraphrase",
+      "query": {
+        "operator": "softsign_like",
+        "semantics": "Divide a value by its absolute magnitude plus one.",
+        "pytorch_reference": "torch.nn.functional.softsign(x)",
+        "diagnostic_text": "The referenced language math function is unavailable",
+        "environment": { "architecture": "riscv64", "triton": "3.4.0" }
+      },
+      "relevance": { "case:missing-api": 3 }
+    },
+    {
+      "id": "import-paraphrase",
+      "query": {
+        "operator": "environment_check",
+        "semantics": "Initialize numerical Python dependencies.",
+        "pytorch_reference": "torch.tensor(x)",
+        "diagnostic_text": "Reference tests cannot start because the array package is absent"
+      },
+      "relevance": { "case:missing-numpy": 3 }
+    },
+    {
+      "id": "hardware-paraphrase",
+      "query": {
+        "operator": "quantized_dot",
+        "semantics": "Multiply matrices with eight-bit floating-point inputs.",
+        "pytorch_reference": "torch.matmul(x, y)",
+        "diagnostic_text": "The CPU target cannot represent the requested low precision type",
+        "environment": { "architecture": "riscv64" }
+      },
+      "relevance": { "case:fp8-hardware": 3 }
+    },
+    {
+      "id": "numerical-paraphrase",
+      "query": {
+        "operator": "scaled_sigmoid",
+        "semantics": "Apply logistic activation to half precision tensors.",
+        "pytorch_reference": "torch.sigmoid(x) * y",
+        "diagnostic_text": "Output values drift beyond acceptable tolerance after exponential computation"
+      },
+      "relevance": { "case:half-precision": 3 }
+    },
+    {
+      "id": "reduction-paraphrase",
+      "query": {
+        "operator": "mean",
+        "semantics": "Aggregate values along one dimension.",
+        "pytorch_reference": "torch.mean(x, dim=dim)",
+        "diagnostic_text": "Structured reduction could not be converted by the mid-end",
+        "environment": { "architecture": "riscv64", "buddy": "22" }
+      },
+      "relevance": { "case:buddy-reduce": 3 }
+    },
+    {
+      "id": "timeout-paraphrase",
+      "query": {
+        "operator": "topk",
+        "semantics": "Process a huge tensor while sorting selected elements.",
+        "pytorch_reference": "torch.topk(x, k)",
+        "diagnostic_text": "Compiler process exceeded its execution deadline"
+      },
+      "relevance": { "case:compile-timeout": 2 }
+    },
+    {
+      "id": "broadcast-paraphrase",
+      "query": {
+        "operator": "elementwise_product",
+        "semantics": "Multiply a matrix with one row expanded across the leading axis.",
+        "pytorch_reference": "torch.mul(x, y)",
+        "diagnostic_text": "Numerical values differ only when an input has a singleton dimension"
+      },
+      "relevance": { "case:broadcast-index": 3 }
+    }
+  ]
+}
