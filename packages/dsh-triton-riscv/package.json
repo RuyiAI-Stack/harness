@@ -30,6 +30,7 @@
     "python/codex_agent/**/*.json",
     "python/codex_agent/**/*.md",
     "python/codex_agent/**/*.yml",
+    "python/codex_agent/tests/fixtures/*.sql",
     "python/codex_agent/**/requirements.txt",
     "python/codex_agent/harness/bundle/index.js",
     "python/codex_agent/harness/bundle/native.js",

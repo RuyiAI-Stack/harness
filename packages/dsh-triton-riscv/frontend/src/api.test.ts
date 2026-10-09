@@ -18,13 +18,13 @@ describe('FastAPI client', () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ run: null }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await api.sendMessage('session-1', '验证 relu_and_mul')
+    await api.sendMessage('session-1', '验证 relu_and_mul', 'request-1')
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/sessions/session-1/messages',
       expect.objectContaining({
         method: 'POST',
-        body: JSON.stringify({ content: '验证 relu_and_mul' }),
+        body: JSON.stringify({ content: '验证 relu_and_mul', request_id: 'request-1' }),
       }),
     )
   })

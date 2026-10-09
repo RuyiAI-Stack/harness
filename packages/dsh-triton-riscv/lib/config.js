@@ -31,17 +31,117 @@ export const CONFIG_ENV = 'TRITON_RISCV_CONFIG'
 export function resolveConfig(input = {}) {
   const c = object(
     input,
-    ['enabled', 'repoRoot', 'python', 'stateDir', 'permissions', 'remote', 'memory'],
+    ['enabled', 'repoRoot', 'python', 'stateDir', 'permissions', 'remote', 'memory', 'storage', 'cache', 'queue'],
     'triton-riscv config',
   )
   const p = object(c.permissions, ['validation', 'development', 'repair'], 'permissions')
   const r = object(c.remote, ['host', 'repository', 'required', 'requireTaskQuotas'], 'remote')
-  const m = object(c.memory, ['database', 'retrievalMode', 'contextFormat', 'embedding'], 'memory')
+  const m = object(c.memory, ['retrievalMode', 'contextFormat', 'embedding'], 'memory')
   const e = object(
     m.embedding,
     ['provider', 'model', 'baseUrl', 'tokenizerJson', 'tokenBudget', 'apiKeyEnv'],
     'embedding',
   )
+  const db = object(c.storage, ['urlEnv', 'poolSize', 'maxOverflow', 'poolTimeout'], 'storage')
+  const cacheDefaults = {
+    enabled: false,
+    urlEnv: 'TRITON_REDIS_URL',
+    ttlSeconds: 60,
+    negativeTtlSeconds: 20,
+    lockMs: 10000,
+    waitMs: 1000,
+    maxBytes: 262144,
+    maxConcurrent: 4,
+    requestsPerSecond: 100,
+    rebuildsPerSecond: 10,
+    bloom: false,
+    bloomCapacity: 10000,
+    bloomErrorRate: 0.001,
+  }
+  const cache = { ...cacheDefaults, ...object(c.cache, Object.keys(cacheDefaults), 'cache') }
+  for (const name of ['enabled', 'bloom']) cache[name] = boolean(cache[name], false, 'cache.' + name)
+  for (const [key, [min, max]] of Object.entries({
+    ttlSeconds: [1, 3600],
+    negativeTtlSeconds: [1, 60],
+    lockMs: [100, 60000],
+    waitMs: [10, 5000],
+    maxBytes: [1024, 1048576],
+    maxConcurrent: [1, 32],
+    requestsPerSecond: [1, 10000],
+    rebuildsPerSecond: [1, 1000],
+    bloomCapacity: [100, 10000000],
+  })) {
+    if (!Number.isInteger(cache[key]) || cache[key] < min || cache[key] > max) throw new Error('Invalid cache.' + key)
+  }
+  if (
+    typeof cache.bloomErrorRate !== 'number' ||
+    !Number.isFinite(cache.bloomErrorRate) ||
+    cache.bloomErrorRate <= 0 ||
+    cache.bloomErrorRate > 0.1
+  )
+    throw new Error('Invalid cache.bloomErrorRate')
+  cache.urlEnv = text(cache.urlEnv, 'TRITON_REDIS_URL', 'cache.urlEnv')
+  if (
+    !/^[A-Za-z_][A-Za-z0-9_]*$/.test(cache.urlEnv) ||
+    /^(TRITON_RISCV_|RISCV_)/.test(cache.urlEnv) ||
+    ['PATH', 'HOME', 'PYTHONPATH', 'PYTHONHOME', db.urlEnv ?? 'TRITON_MYSQL_URL'].includes(cache.urlEnv)
+  )
+    throw new Error('Invalid cache.urlEnv')
+  const urlEnv = text(db.urlEnv, 'TRITON_MYSQL_URL', 'storage.urlEnv')
+  if (
+    !/^[A-Za-z_][A-Za-z0-9_]*$/.test(urlEnv) ||
+    /^(TRITON_RISCV_|RISCV_)/.test(urlEnv) ||
+    ['PATH', 'HOME', 'PYTHONPATH', 'PYTHONHOME'].includes(urlEnv)
+  )
+    throw new Error('Invalid storage.urlEnv')
+  const storage = {
+    urlEnv,
+    poolSize: db.poolSize ?? 5,
+    maxOverflow: db.maxOverflow ?? 5,
+    poolTimeout: db.poolTimeout ?? 10,
+  }
+  const queueDefaults = {
+    enabled: false,
+    urlEnv: 'TRITON_AMQP_URL',
+    leaseSeconds: 60,
+    maxAttempts: 3,
+    jobTimeoutSeconds: 1200,
+    maxPending: 100,
+  }
+  const queue = { ...queueDefaults, ...object(c.queue, Object.keys(queueDefaults), 'queue') }
+  queue.enabled = boolean(queue.enabled, false, 'queue.enabled')
+  queue.urlEnv = text(queue.urlEnv, 'TRITON_AMQP_URL', 'queue.urlEnv')
+  if (
+    !/^[A-Za-z_][A-Za-z0-9_]*$/.test(queue.urlEnv) ||
+    /^(TRITON_RISCV_|RISCV_)/.test(queue.urlEnv) ||
+    [
+      'PATH',
+      'HOME',
+      'PYTHONPATH',
+      'PYTHONHOME',
+      storage.urlEnv,
+      cache.urlEnv,
+      e.apiKeyEnv ?? 'AGENT_EMBEDDING_API_KEY',
+    ].includes(queue.urlEnv)
+  )
+    throw new Error('Invalid queue.urlEnv')
+  for (const [key, [min, max]] of Object.entries({
+    leaseSeconds: [15, 600],
+    maxAttempts: [1, 10],
+    jobTimeoutSeconds: [30, 7200],
+    maxPending: [1, 10000],
+  })) {
+    if (!Number.isInteger(queue[key]) || queue[key] < min || queue[key] > max) throw new Error('Invalid queue.' + key)
+  }
+  for (const [key, value] of Object.entries(storage)) {
+    if (key === 'urlEnv') continue
+    if (
+      !Number.isInteger(value) ||
+      value < (key === 'maxOverflow' ? 0 : 1) ||
+      value > (key === 'poolTimeout' ? 60 : 50)
+    )
+      throw new Error('Invalid storage.' + key)
+  }
   const enabled = boolean(c.enabled, false, 'enabled')
   const repoRoot = absolute(c.repoRoot, '', 'repoRoot')
   const python = absolute(c.python, join(packageRoot, '.venv/bin/python'), 'python')
@@ -69,6 +169,9 @@ export function resolveConfig(input = {}) {
     repoRoot,
     python,
     stateDir,
+    storage,
+    cache,
+    queue,
     permissions: {
       validation: boolean(p.validation, false, 'permissions.validation'),
       development: boolean(p.development, false, 'permissions.development'),
@@ -76,7 +179,6 @@ export function resolveConfig(input = {}) {
     },
     remote: { host, repository, required, requireTaskQuotas },
     memory: {
-      database: absolute(m.database, stateDir ? join(stateDir, 'memory.sqlite3') : '', 'memory.database'),
       retrievalMode: text(m.retrievalMode, 'legacy', 'memory.retrievalMode'),
       contextFormat: text(m.contextFormat, 'classic', 'memory.contextFormat'),
       embedding: {
@@ -97,6 +199,12 @@ export function workerEnvironment(config, ambient = process.env) {
   const env = { [CONFIG_ENV]: document }
   const key = config.memory.embedding.apiKeyEnv
   if (ambient[key]) env[key] = ambient[key]
+  const databaseKey = config.storage.urlEnv
+  if (ambient[databaseKey]) env[databaseKey] = ambient[databaseKey]
+  const cacheKey = config.cache.urlEnv
+  if (config.cache.enabled && ambient[cacheKey]) env[cacheKey] = ambient[cacheKey]
+  const queueKey = config.queue.urlEnv
+  if (config.queue.enabled && ambient[queueKey]) env[queueKey] = ambient[queueKey]
   return env
 }
 export function bridgeEnvironment(config, ambient = process.env) {
@@ -141,7 +249,6 @@ export function configFromEnvironment(env) {
       requireTaskQuotas: quota === '1' || quota === 'true',
     },
     memory: {
-      database: env.TRITON_RISCV_MEMORY_DB,
       retrievalMode: env.TRITON_RISCV_MEMORY_RETRIEVAL_MODE,
       contextFormat: env.TRITON_RISCV_MEMORY_CONTEXT_FORMAT,
       embedding: {

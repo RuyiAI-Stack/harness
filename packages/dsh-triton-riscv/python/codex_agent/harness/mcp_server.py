@@ -115,15 +115,36 @@ def retrieve_operator_memory_tool(
         error_text=error_text, limit=limit, candidate_strategy=candidate_strategy)
 
 
+def _submit_validation_task(root, operator, run_id):
+    from codex_agent.tasks.service import TaskService
+    job = TaskService(root).submit_validation(operator, run_id, "validation:" + run_id)
+    if job["status"] in {"succeeded", "failed"} and job["result"].get("receipt_path"):
+        return job["result"]
+    return {"status": "queued" if job["status"] in {"queued", "running"} else "blocked",
+            "async_job": True, "queue_status": job["status"], "job_id": job["id"], "run_id": run_id,
+            "message": "Not a test result. End this turn; inspect_queued_task reads persisted progress later."}
+
+
 @server.tool(name="execute_approved_validation", structured_output=True,
              annotations=ToolAnnotations(read_only_hint=False, destructive_hint=True, open_world_hint=True))
-def execute_approved_validation_tool(run_id: str) -> ValidationToolResult:
+def execute_approved_validation_tool(run_id: str) -> dict[str, Any]:
     """Execute the exact host-approved plan. After SSH loss, use the SAME run_id to collect its original remote job, not restart. Unknown evidence needs host inspection. The model cannot grant approval."""
     from codex_agent.operator_lifecycle import _load_receipt
     root = repository_root()
     receipt = _load_receipt(root, run_id)
+    from codex_agent.runtime_config import runtime_config
+    if runtime_config().queue.enabled:
+        return _submit_validation_task(root, receipt["operator"], run_id)
     return validate_operator_target(root, receipt["operator"], execute=True, approved_run_id=run_id,
-        source_env=receipt.get("source_env", True), timeout_seconds=receipt.get("timeout_seconds", 900))
+        source_env=receipt.get("source_env", True), timeout_seconds=receipt.get("timeout_seconds", 900)).model_dump()
+
+
+@server.tool(name="inspect_queued_task", structured_output=True,
+             annotations=ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=False))
+def inspect_queued_task_tool(job_id: str) -> dict[str, Any]:
+    """Read persisted queue/worker results; queued or published never means tests passed. No wait loop, replay or execution."""
+    from codex_agent.tasks.store import JobStore
+    return JobStore(repository_root()).detail(job_id)
 
 
 @server.tool(name="get_validation_status", structured_output=True,
@@ -322,7 +343,12 @@ def validate_operator_tool(
     approved_run_id: str | None = None,
     source_env: bool = True,
     timeout_seconds: int = 900,
-) -> ValidationToolResult:
+) -> dict[str, Any]:
+    from codex_agent.runtime_config import runtime_config
+    if execute and runtime_config().queue.enabled:
+        if not approved_run_id:
+            raise PermissionError("an approved validation plan is required")
+        return _submit_validation_task(repository_root(), operator_name, approved_run_id)
     return validate_operator_target(
         repository_root(),
         operator_name,
@@ -330,7 +356,7 @@ def validate_operator_tool(
         approved_run_id=approved_run_id,
         source_env=source_env,
         timeout_seconds=timeout_seconds,
-    )
+    ).model_dump()
 
 
 @server.tool(

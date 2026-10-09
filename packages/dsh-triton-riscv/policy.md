@@ -30,6 +30,10 @@ For an existing operator:
 4. Call `mcp__triton_riscv__validate_operator` with `execute=false` to plan.
 5. Call `mcp__triton_riscv__execute_approved_validation` with the exact plan's `run_id` to request host approval and execution.
 
+When queue mode returns `status=queued` and a `job_id`, report submission, not success.
+End the turn so the validation worker can take the workspace. On a later turn,
+use `mcp__triton_riscv__inspect_queued_task`; do not poll in a loop or create another plan.
+
 If remote validation loses its SSH connection, keep the original approved
 `run_id`. Calling `execute_approved_validation` again with that exact ID can
 query/collect the original durable remote job; it must not start a replacement.

@@ -44,11 +44,42 @@ class Embedding(Settings):
     apiKeyEnv: str = "AGENT_EMBEDDING_API_KEY"
 
 
+class Storage(Settings):
+    urlEnv: str = "TRITON_MYSQL_URL"
+    poolSize: int = Field(default=5, ge=1, le=50)
+    maxOverflow: int = Field(default=5, ge=0, le=50)
+    poolTimeout: int = Field(default=10, ge=1, le=60)
+
+
+class Cache(Settings):
+    enabled: bool = False
+    urlEnv: str = "TRITON_REDIS_URL"
+    ttlSeconds: int = Field(default=60, ge=1, le=3600)
+    negativeTtlSeconds: int = Field(default=20, ge=1, le=60)
+    lockMs: int = Field(default=10000, ge=100, le=60000)
+    waitMs: int = Field(default=1000, ge=10, le=5000)
+    maxBytes: int = Field(default=262144, ge=1024, le=1048576)
+    maxConcurrent: int = Field(default=4, ge=1, le=32)
+    requestsPerSecond: int = Field(default=100, ge=1, le=10000)
+    rebuildsPerSecond: int = Field(default=10, ge=1, le=1000)
+    bloom: bool = False
+    bloomCapacity: int = Field(default=10000, ge=100, le=10000000)
+    bloomErrorRate: float = Field(default=0.001, gt=0, le=0.1)
+
+
 class Memory(Settings):
-    database: str | None = None
     retrievalMode: str = "legacy"
     contextFormat: str = "classic"
     embedding: Embedding = Field(default_factory=Embedding)
+
+
+class Queue(Settings):
+    enabled: bool = False
+    urlEnv: str = "TRITON_AMQP_URL"
+    leaseSeconds: int = Field(default=60, ge=15, le=600)
+    maxAttempts: int = Field(default=3, ge=1, le=10)
+    jobTimeoutSeconds: int = Field(default=1200, ge=30, le=7200)
+    maxPending: int = Field(default=100, ge=1, le=10000)
 
 
 class RuntimeConfig(Settings):
@@ -58,6 +89,9 @@ class RuntimeConfig(Settings):
     permissions: Permissions = Field(default_factory=Permissions)
     remote: Remote = Field(default_factory=Remote)
     memory: Memory = Field(default_factory=Memory)
+    storage: Storage = Field(default_factory=Storage)
+    cache: Cache = Field(default_factory=Cache)
+    queue: Queue = Field(default_factory=Queue)
 
 
 def _unique(pairs):
@@ -92,7 +126,7 @@ def _parse_native(raw: str) -> RuntimeConfig:
         for path in (cfg.repoRoot, cfg.stateDir):
             if not path or not Path(path).is_absolute():
                 raise ValueError("workspace and state paths must be absolute")
-        for path in (cfg.memory.database, cfg.memory.embedding.tokenizerJson):
+        for path in (cfg.memory.embedding.tokenizerJson,):
             if path and not Path(path).is_absolute():
                 raise ValueError("memory paths must be absolute")
         remote = cfg.remote
@@ -105,7 +139,22 @@ def _parse_native(raw: str) -> RuntimeConfig:
             raise ValueError("invalid remote repository")
         if remote.requireTaskQuotas and not remote.required:
             raise ValueError("task quotas require remote mode")
+        db_key = cfg.storage.urlEnv
+        if (not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", db_key)
+                or db_key.startswith(("TRITON_RISCV_", "RISCV_"))
+                or db_key in {"PATH", "HOME", "PYTHONPATH", "PYTHONHOME"}):
+            raise ValueError("reserved or invalid database credential variable")
+        cache_key = cfg.cache.urlEnv
+        if (not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", cache_key)
+                or cache_key.startswith(("TRITON_RISCV_", "RISCV_"))
+                or cache_key in {"PATH", "HOME", "PYTHONPATH", "PYTHONHOME", db_key}):
+            raise ValueError("reserved or invalid cache credential variable")
         key = cfg.memory.embedding.apiKeyEnv
+        mq_key = cfg.queue.urlEnv
+        if (not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", mq_key)
+                or mq_key.startswith(("TRITON_RISCV_", "RISCV_"))
+                or mq_key in {"PATH", "HOME", "PYTHONPATH", "PYTHONHOME", db_key, cache_key, key}):
+            raise ValueError("reserved or invalid queue credential variable")
         if (not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key)
                 or key.startswith(("TRITON_RISCV_", "RISCV_"))
                 or key in {"PATH", "HOME", "PYTHONPATH", "PYTHONHOME"}):
@@ -141,7 +190,6 @@ def _legacy_config(env: Mapping[str, str]) -> RuntimeConfig:
             required=env.get("TRITON_RISCV_REQUIRE_REMOTE") == "1",
             requireTaskQuotas=env.get("TRITON_RISCV_REQUIRE_TASK_QUOTAS", "").strip().lower() in {"1", "true"}),
         memory=Memory(
-            database=env.get("TRITON_RISCV_MEMORY_DB"),
             retrievalMode=env.get("TRITON_RISCV_MEMORY_RETRIEVAL_MODE", "legacy"),
             contextFormat=env.get("TRITON_RISCV_MEMORY_CONTEXT_FORMAT", "classic"),
             embedding=Embedding(

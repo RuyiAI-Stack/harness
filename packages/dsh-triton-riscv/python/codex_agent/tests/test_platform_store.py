@@ -10,7 +10,7 @@ from codex_agent.platform.store import PlatformStore
 class PlatformStoreTests(unittest.TestCase):
     def test_persists_session_messages_runs_and_events(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            store = PlatformStore(Path(temp_dir) / "platform.sqlite3")
+            store = PlatformStore(Path(temp_dir))
             session = store.create_session()
             message = store.add_message(
                 session["id"], "user", "验证 relu", {"source": "test"}
@@ -36,7 +36,7 @@ class PlatformStoreTests(unittest.TestCase):
 
     def test_rejects_unknown_session(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            store = PlatformStore(Path(temp_dir) / "platform.sqlite3")
+            store = PlatformStore(Path(temp_dir))
             with self.assertRaises(KeyError):
                 store.get_session("missing")
 

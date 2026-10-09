@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 from codex_agent.diagnostic_memory import (
-    memory_database_path,
+    memory_workspace,
     record_from_validation_receipt,
     remember_validation,
     retrieve_memories,
@@ -76,7 +76,7 @@ class DiagnosticMemoryTests(unittest.TestCase):
             self.assertEqual(first["status"], "recorded")
             self.assertEqual(second["status"], "deduplicated")
             self.assertEqual(first["memory_id"], second["memory_id"])
-            with MemoryStore(memory_database_path(root)) as store:
+            with MemoryStore(memory_workspace(root)) as store:
                 stored = store.list()
             self.assertEqual(len(stored), 1)
             self.assertEqual(stored[0]["source_run"], "operator-lifecycle:run-failed")
@@ -84,7 +84,7 @@ class DiagnosticMemoryTests(unittest.TestCase):
     def test_retrieval_finds_cross_operator_evidence_and_excludes_current_run(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            with MemoryStore(memory_database_path(root)) as store:
+            with MemoryStore(memory_workspace(root)) as store:
                 expected_id, _ = store.add(
                     MemoryRecord(
                         memory_type="successful-repair",

@@ -37,7 +37,7 @@ class HarnessRunExecutor:
         self.repo_root = repo_root.resolve()
         self.store = store
         self.agent = agent
-        self.pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="dsh-agent")
+        self.pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="dsh-agent") if workers else None
         self._active: set[str] = set()
         self._lock = threading.Lock()
         settings = agent.settings
@@ -77,6 +77,8 @@ class HarnessRunExecutor:
         return self.store.get_run(run_id)
 
     def _queue(self, run_id: str, *, phase: str) -> None:
+        if self.pool is None:
+            raise RuntimeError("This executor is worker-owned; submit through the task service")
         self.store.update_run(run_id, status="queued", phase=phase)
         with self._lock:
             if run_id not in self._active:
@@ -84,7 +86,8 @@ class HarnessRunExecutor:
                 self.pool.submit(self._execute, run_id)
 
     def close(self) -> None:
-        self.pool.shutdown(wait=True, cancel_futures=True)
+        if self.pool is not None:
+            self.pool.shutdown(wait=True, cancel_futures=True)
         self.agent.close()
 
     @staticmethod

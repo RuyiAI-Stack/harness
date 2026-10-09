@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from mcp import Client
 
 import codex_agent
-from codex_agent.diagnostic_memory import memory_database_path, remember_validation
+from codex_agent.diagnostic_memory import memory_workspace, remember_validation
 from codex_agent.harness import HarnessAgent, HarnessSettings
 from codex_agent.harness.mcp_server import server
 from codex_agent.platform.api import create_app
@@ -52,14 +52,14 @@ class InstalledMigrationTests(unittest.TestCase):
                     self.assertEqual(client.get("/api/health").json()["repo_root"], str(root.resolve()))
                     session = client.post("/api/sessions", json={"title": "migration"}).json()
                     self.assertEqual(client.delete(f"/api/sessions/{session['id']}").status_code, 204)
-            self.assertTrue((state / "platform.sqlite3").is_file())
+            self.assertFalse((state / "platform.sqlite3").exists())
             self.assertFalse((root / "codex_agent").exists())
             self.assertFalse((root / "agent-results/platform.sqlite3").exists())
 
     def test_managed_context_reaches_executor_and_persists(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            store = PlatformStore(root / "state.sqlite3")
+            store = PlatformStore(root)
             settings = HarnessSettings.from_env(root, {"TRITON_RISCV_CONTEXT_SUMMARY_MODE": "extractive"})
             executor = HarnessRunExecutor(root, store, HarnessAgent(settings, FakeHarnessBackend()))
             try:
@@ -80,7 +80,6 @@ class MemoryMcpMigrationTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             with patch.dict(os.environ, {"TRITON_RISCV_REPO_ROOT": str(root),
-                    "TRITON_RISCV_MEMORY_DB": str(root / "history.sqlite3"),
                     "TRITON_RISCV_EMBEDDING_PROVIDER": "none",
                     "TRITON_RISCV_MEMORY_RETRIEVAL_MODE": "legacy"}):
                 remember_validation(root, failed_receipt("previous"), OPERATOR)
@@ -96,4 +95,5 @@ class MemoryMcpMigrationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(item["recommended_actions"], ["Preserve the failing IR."])
                 self.assertIsNone(item["applied_action"])
                 self.assertEqual(item["source_run"], "operator-lifecycle:previous")
-                self.assertEqual(Path(payload["database"]), memory_database_path(root))
+                self.assertEqual(payload["database"], "mysql")
+                self.assertEqual(Path(payload["workspace"]), memory_workspace(root))

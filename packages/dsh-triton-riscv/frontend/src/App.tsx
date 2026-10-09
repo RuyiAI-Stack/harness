@@ -305,6 +305,7 @@ export default function App() {
   } | null>(null)
   const eventSource = useRef<EventSource | null>(null)
   const messagesEnd = useRef<HTMLDivElement | null>(null)
+  const pendingRequest = useRef<{ session: string; text: string; id: string } | null>(null)
 
   const closeStream = () => {
     eventSource.current?.close()
@@ -470,7 +471,12 @@ export default function App() {
     setStreamingText('')
     setError(null)
     try {
-      const result = await api.sendMessage(activeSessionId, content.trim())
+      const text = content.trim()
+      if (pendingRequest.current?.session !== activeSessionId || pendingRequest.current.text !== text) {
+        pendingRequest.current = { session: activeSessionId, text, id: crypto.randomUUID() }
+      }
+      const result = await api.sendMessage(activeSessionId, text, pendingRequest.current.id)
+      pendingRequest.current = null
       setBundle(current =>
         current
           ? {

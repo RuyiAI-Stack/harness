@@ -38,6 +38,14 @@
 - id: triton-riscv-native-host
   config:
     enabled: false
+    storage:
+      urlEnv: TRITON_MYSQL_URL # Secret MySQL URL in the host environment, never in this file
+    cache:
+      enabled: false # Optional Redis; requires maxmemory-policy noeviction
+      urlEnv: TRITON_REDIS_URL
+    queue:
+      enabled: false # Start relay/recover/agent/validation/memory processes before enabling
+      urlEnv: TRITON_AMQP_URL
     # Optional; defaults to packages/dsh-triton-riscv/.venv/bin/python
     # python: /absolute/path/to/harness/packages/dsh-triton-riscv/.venv/bin/python
     permissions:

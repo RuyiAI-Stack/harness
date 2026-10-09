@@ -4,7 +4,7 @@ import { parseEnv } from 'node:util'
 
 const localKeys = new Set([
   'DSH_NATIVE_SOURCE', 'DSH_HOME', 'DSH_MODEL', 'DSH_PROVIDER', 'ISRC_BASE_URL',
-  'TRITON_RISCV_REPO_ROOT', 'TRITON_RISCV_STATE_DIR', 'TRITON_RISCV_MEMORY_DB',
+  'TRITON_RISCV_REPO_ROOT', 'TRITON_RISCV_STATE_DIR',
   'TRITON_RISCV_MCP_PYTHON', 'TRITON_RISCV_NATIVE_PORT', 'TRITON_RISCV_KEYCHAIN_SERVICE',
   'TRITON_RISCV_BROWSER_DIRECTORY_PICKER', 'TRITON_RISCV_MEMORY_RETRIEVAL_MODE',
   'TRITON_RISCV_MEMORY_CONTEXT_FORMAT', 'TRITON_RISCV_EMBEDDING_PROVIDER',
@@ -20,6 +20,8 @@ export function loadLocalEnvironment(root, ambient = process.env) {
   if (existsSync(settingsPath)) {
     const local = JSON.parse(readFileSync(settingsPath, 'utf8'))
     for (const [key, value] of Object.entries(local)) {
+      if (key === 'TRITON_RISCV_MEMORY_DB')
+        throw new Error('Legacy memory database setting: import SQLite into MySQL, then remove TRITON_RISCV_MEMORY_DB from .state/native-local.json')
       if (!localKeys.has(key) || typeof value !== 'string')
         throw new Error('Invalid local configuration key: ' + key)
       if (env[key] === undefined) env[key] = value

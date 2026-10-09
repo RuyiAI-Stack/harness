@@ -10,6 +10,7 @@ export const OPERATOR_TOOLS = new Set(
     'execute_validation_job',
     'get_validation_job',
     'get_validation_status',
+    'inspect_queued_task',
     'evaluate_plugin_fixtures',
     'retrieve_operator_memory',
     'execute_approved_validation',

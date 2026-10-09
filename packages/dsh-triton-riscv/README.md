@@ -8,6 +8,7 @@ A Harness plugin for operator development, testing, repair, and historical evide
 node >= 22.19 (with npm)
 pnpm >= 11
 python3 >= 3.10
+MySQL 8.4
 ```
 
 An existing Triton-RISCV checkout is required as the workspace.
@@ -25,6 +26,17 @@ Follow the [host configuration](../../README.md). Set `config.enabled: true` in 
 ```sh
 ./tools/scripts/install-all.sh
 ```
+
+Create an empty MySQL database named `triton_agent`. Export its connection URL
+in the terminal that starts Harness (URL-encode special characters in passwords):
+
+```sh
+export TRITON_MYSQL_URL='mysql+pymysql://USER:PASSWORD@127.0.0.1:3306/triton_agent'
+packages/dsh-triton-riscv/.venv/bin/python -m codex_agent.storage upgrade
+```
+
+Keep credentials outside Git. Each selected workspace has isolated records.
+For existing SQLite data, [import it before first launch](python/codex_agent/README.md#existing-data).
 
 ### Quick Activate
 
@@ -64,9 +76,28 @@ Open **http://127.0.0.1:8765**. FastAPI serves the built frontend; no separate f
 
 Live requests need separate `ISRC_API_KEY` and `DSH_MODEL` settings. Workbench and native sessions are independent.
 
+### Optional Redis Cache
+
+Use a private standalone Redis with a memory limit and `maxmemory-policy noeviction`.
+Export `TRITON_REDIS_URL` in the Harness terminal; set `cache.enabled: true` in the
+plugin config. Credentials stay outside Git. Redis is off by default.
+
+```sh
+export TRITON_REDIS_URL='redis://127.0.0.1:6379/0'
+```
+
+Historical retrieval, case details and statistics are cached; approvals and run
+state are not. Writes invalidate versioned results. Cache errors use bounded
+MySQL fallback, then report busy rather than returning false "not found" results.
+All workers must use the same limits and MySQL endpoint. This is not multi-user authentication.
+See [backend options](python/codex_agent/README.md#redis-options).
+
 ### Development Tests
 
 From the plugin directory:
+
+Use a disposable MySQL database, export its URL as above, and run the schema
+upgrade before the Python tests. Tests do not require a model API or RISC-V host.
 
 ```sh
 npm test

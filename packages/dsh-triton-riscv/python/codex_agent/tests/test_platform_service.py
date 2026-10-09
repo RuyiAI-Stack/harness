@@ -254,7 +254,7 @@ class PlatformServiceTests(unittest.TestCase):
             },
         )
         agent = HarnessAgent(settings, FakeHarnessBackend())
-        store = PlatformStore(results / "platform.sqlite3")
+        store = PlatformStore(root)
         service = PlatformService(root, store, agent)
         executor = HarnessRunExecutor(root, store, agent, workers=1)
         return store, service, executor
@@ -327,7 +327,7 @@ class PlatformServiceTests(unittest.TestCase):
             results.mkdir()
             settings = HarnessSettings.from_env(root, {"ISRC_API_KEY": "test-key"})
             agent = HarnessAgent(settings, ErrorHarnessBackend())
-            store = PlatformStore(results / "platform.sqlite3")
+            store = PlatformStore(root)
             service = PlatformService(root, store, agent)
             executor = HarnessRunExecutor(root, store, agent, workers=1)
             self.addCleanup(executor.close)

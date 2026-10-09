@@ -1313,7 +1313,7 @@ def parse_args() -> argparse.Namespace:
         default=True,
         help="Retrieve and record evidence-gated operator memories.",
     )
-    parser.add_argument("--memory-db", default="agent-results/memory.sqlite3")
+    parser.add_argument("--memory-workspace", type=Path, help="Isolated MySQL memory workspace; defaults to the target repository")
     parser.add_argument("--memory-limit", type=int, default=5)
     parser.add_argument(
         "--memory-auto-ingest",
@@ -1361,7 +1361,7 @@ def main() -> int:
     memory_ingest = None
     generation_memories: list[dict] = []
     if args.memory:
-        memory_path = Path(args.memory_db)
+        memory_path = args.memory_workspace or repo_root
         if not memory_path.is_absolute():
             memory_path = repo_root / memory_path
         try:
@@ -1407,7 +1407,7 @@ def main() -> int:
         run_dir / "memory-status.json",
         {
             "enabled": args.memory,
-            "database": args.memory_db if args.memory else None,
+            "database": "mysql" if args.memory else None,
             "embedding_provider": args.embedding_provider,
             "auto_ingest": memory_ingest,
             "retrieved": len(generation_memories),

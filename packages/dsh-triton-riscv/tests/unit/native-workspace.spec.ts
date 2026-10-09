@@ -32,26 +32,26 @@ it('selected workspace overrides the legacy fallback and binds every execution p
   expect(mcpConfiguration(config).cwd).toBe(b)
   expect(JSON.parse(bridgeEnvironment(config, { TRITON_RISCV_REPO_ROOT: a }).TRITON_RISCV_CONFIG).repoRoot).toBe(b)
   expect(config.stateDir).toBe(join(b, 'agent-results'))
-  expect(config.memory.database).toBe(join(b, 'agent-results/memory.sqlite3'))
+  expect(config.storage.urlEnv).toBe('TRITON_MYSQL_URL')
 })
-it('preserves existing explicit state/database paths only for the legacy target', () => {
+it('preserves explicit state paths only for the legacy target', () => {
   const { root, a, b } = fixture()
-  const input = { repoRoot: a, stateDir: join(root, 'state'), memory: { database: join(root, 'old.sqlite3') } }
+  const input = { repoRoot: a, stateDir: join(root, 'state') }
   const old = resolveSessionConfig(input, session())!
   expect(old.repoRoot).toBe(a)
   expect(old.stateDir).toBe(input.stateDir)
-  expect(old.memory.database).toBe(input.memory.database)
   const changed = resolveSessionConfig(input, session(b))!
   expect(changed.stateDir).toContain('/workspaces/')
-  expect(changed.memory.database).not.toBe(old.memory.database)
+  expect(changed.repoRoot).not.toBe(old.repoRoot)
 })
 it('namespaces custom storage across workspaces and reuses it across sessions in the same workspace', () => {
   const { root, a, b } = fixture()
-  const input = { stateDir: join(root, 'state'), memory: { database: join(root, 'memory.sqlite3') } }
+  const input = { stateDir: join(root, 'state') }
   const one = resolveSessionConfig(input, session(a))!,
     two = resolveSessionConfig(input, session(b))!
   expect(one.stateDir).not.toBe(two.stateDir)
-  expect(one.memory.database).not.toBe(two.memory.database)
+  expect(one.repoRoot).not.toBe(two.repoRoot)
+  expect(one.storage).toEqual(two.storage)
   expect(resolveSessionConfig(input, { ...session(a), id: 'another' })).toEqual(one)
 })
 it('canonicalizes symlinks so aliases share the same repository history', () => {

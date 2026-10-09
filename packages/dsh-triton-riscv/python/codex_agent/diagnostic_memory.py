@@ -22,19 +22,11 @@ from codex_agent.memory import (
 )
 
 
-MEMORY_DB = Path("agent-results/memory.sqlite3")
 MAX_MEMORY_RESULTS = 10
 
 
-def memory_database_path(repo_root: Path) -> Path:
-    from codex_agent.paths import state_root
-    value = runtime_config().memory.database
-    if value is None:
-        return state_root(repo_root) / "memory.sqlite3"
-    configured = Path(value)
-    if configured.is_absolute():
-        return configured
-    return repo_root.resolve() / configured
+def memory_workspace(repo_root: Path) -> Path:
+    return repo_root.resolve()
 
 
 def build_configured_embedding_provider():
@@ -185,7 +177,7 @@ def remember_validation(
         if record is None:
             return {"status": "not-recorded", "reason": "validation was not executed"}
         provider = build_configured_embedding_provider()
-        with MemoryStore(memory_database_path(repo_root), provider) as store:
+        with MemoryStore(memory_workspace(repo_root), provider) as store:
             memory_id, created = store.add(record)
         return {
             "status": "recorded" if created else "deduplicated",
@@ -277,7 +269,7 @@ def retrieve_memories(
     diagnostic_text = " ".join([rule_id or "", *evidence])
     try:
         provider = build_configured_embedding_provider()
-        database = memory_database_path(repo_root)
+        database = memory_workspace(repo_root)
         with MemoryStore(database, provider) as store:
             items = store.retrieve(
                 MemoryQuery(
@@ -299,7 +291,8 @@ def retrieve_memories(
         public = [_public_item(item, semantics + " " + diagnostic_text) for item in items]
         return {
             "status": "found" if items else "empty",
-            "database": database.as_posix(),
+            "database": "mysql",
+            "workspace": database.as_posix(),
             "query": {
                 "operator": operator_name,
                 "failure_stage": failure_stage,
@@ -312,7 +305,8 @@ def retrieve_memories(
     except Exception as error:
         return {
             "status": "unavailable",
-            "database": memory_database_path(repo_root).as_posix(),
+            "database": "mysql",
+            "workspace": memory_workspace(repo_root).as_posix(),
             "query": {
                 "operator": operator_name,
                 "failure_stage": failure_stage,

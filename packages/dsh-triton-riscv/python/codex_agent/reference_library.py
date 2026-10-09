@@ -15,7 +15,9 @@ import json
 from pathlib import Path
 import re
 import shlex
-import sqlite3
+from codex_agent.storage.database import WorkspaceDatabase
+from codex_agent.storage.schema import references as catalog_table
+from codex_agent.storage.cache import ReadCache
 import subprocess
 
 from codex_agent.memory import SECRET_PATTERNS, jaccard, tokens
@@ -324,11 +326,13 @@ def build_library(root: Path, output: Path, *, excluded_operators: set[str] | No
         seen.add(record["reference_id"])
         records.append(record)
     output.mkdir(parents=True)
-    database = output / "references.sqlite3"
-    with sqlite3.connect(database) as connection:
-        connection.execute("CREATE TABLE references_catalog (id TEXT PRIMARY KEY, admitted INTEGER NOT NULL, payload TEXT NOT NULL)")
-        connection.executemany("INSERT INTO references_catalog VALUES (?, ?, ?)",
-                               [(r["reference_id"], r["decision"] == "admitted", json.dumps(r, ensure_ascii=False)) for r in records])
+    database = WorkspaceDatabase(output)
+    database.register()
+    with database.transaction() as connection:
+        for record in records:
+            database.insert(connection, catalog_table, {
+                "id": record["reference_id"], "admitted": int(record["decision"] == "admitted"),
+                "payload": json.dumps(record, ensure_ascii=False)})
     for decision, filename in (("admitted", "admitted.jsonl"), ("quarantined", "quarantine.jsonl")):
         with (output / filename).open("x", encoding="utf-8") as stream:
             for record in records:
@@ -342,7 +346,7 @@ def build_library(root: Path, output: Path, *, excluded_operators: set[str] | No
                 "quarantined": sum(r["decision"] == "quarantined" for r in records),
                 "quarantine_reasons": dict(sorted(reasons.items())),
                 "rejected_receipts": rejected_receipts, "excluded_operators": sorted(excluded),
-                "product_database_modified": False, "model_or_remote_calls": 0,
+                "product_memory_modified": False, "catalog_storage": "mysql", "model_or_remote_calls": 0,
                 "limitations": ["heuristic static checks are not a sandbox or proof of correctness",
                                 "no arbitrary docs or PR claims promoted to verified rules",
                                 "historical validation may not match current source hashes",
@@ -358,16 +362,12 @@ def search_library(library: Path, query: str, *, environment: dict,
         raise ValueError("limit must be between 1 and 10")
     if environment.get("architecture") != "riscv64" or not environment.get("triton"):
         raise ValueError("explicit riscv64 architecture and Triton version required")
-    database = library.resolve() / "references.sqlite3"
-    connection = sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)
-    try:
-        connection.execute("PRAGMA query_only=ON")
-        rows = connection.execute("SELECT payload FROM references_catalog WHERE admitted=1 ORDER BY id").fetchall()
-    finally:
-        connection.close()
+    database = WorkspaceDatabase(library)
+    rows = ReadCache(database, "references").get("admitted", {}, lambda:
+        database.rows(catalog_table, catalog_table.c.admitted == 1, order=(catalog_table.c.id,)))
     items, rejected = [], []
-    for (payload,) in rows:
-        record = json.loads(payload)
+    for row in rows:
+        record = json.loads(row["payload"])
         if (record.get("schema") != SCHEMA or record.get("decision") != "admitted"
                 or record.get("provenance") != "real" or not record.get("validation")):
             rejected.append({"id": record.get("reference_id"), "reason": "invalid-admission-metadata"})

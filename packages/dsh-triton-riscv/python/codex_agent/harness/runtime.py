@@ -81,6 +81,11 @@ class DeepSeekHarnessBackend:
                 "TRITON_RISCV_REQUIRE_APPROVED_VALIDATION", "1"
             ),
         }
+        from codex_agent.runtime_config import CONFIG_ENV, runtime_config
+        config = runtime_config()
+        for key in (CONFIG_ENV, config.storage.urlEnv, config.cache.urlEnv, config.queue.urlEnv):
+            if os.environ.get(key):
+                runtime_env[key] = os.environ[key]
         for name, value in os.environ.items():
             if name.startswith(("TRITON_RISCV_MEMORY_", "TRITON_RISCV_EMBEDDING_")) or name in {
                 "TRITON_RISCV_STATE_DIR", "AGENT_EMBEDDING_API_KEY",

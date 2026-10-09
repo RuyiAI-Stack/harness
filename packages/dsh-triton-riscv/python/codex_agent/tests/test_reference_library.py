@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import sqlite3
+from codex_agent.storage.database import WorkspaceDatabase
+from codex_agent.storage.schema import references as catalog_table
 import tempfile
 import unittest
 
@@ -260,20 +261,20 @@ class ReferenceLibraryTests(unittest.TestCase):
         production.write_bytes(b"original unrelated database")
         before = digest(production.read_bytes())
         self.build()
-        catalog = self.output / "references.sqlite3"
-        original = digest(catalog.read_bytes())
+        catalog = WorkspaceDatabase(self.output)
+        original = catalog.rows(catalog_table)
         search_library(self.output, "demo", environment=ENV)
-        self.assertEqual(original, digest(catalog.read_bytes()))
+        self.assertEqual(original, catalog.rows(catalog_table))
         self.assertEqual(before, digest(production.read_bytes()))
 
     def test_search_rechecks_admission_metadata(self):
         self.build()
-        catalog = self.output / "references.sqlite3"
-        with sqlite3.connect(catalog) as connection:
-            row = connection.execute("SELECT id,payload FROM references_catalog").fetchone()
-            data = json.loads(row[1])
-            data["decision"] = "quarantined"
-            connection.execute("UPDATE references_catalog SET payload=? WHERE id=?", (json.dumps(data), row[0]))
+        catalog = WorkspaceDatabase(self.output)
+        row = catalog.rows(catalog_table)[0]
+        data = json.loads(row["payload"])
+        data["decision"] = "quarantined"
+        with catalog.transaction() as connection:
+            catalog.update(connection, catalog_table, {"payload": json.dumps(data)}, catalog_table.c.id == row["id"])
         self.assertEqual(search_library(self.output, "demo", environment=ENV)["items"], [])
 
     def test_no_lexical_match_returns_no_reference(self):

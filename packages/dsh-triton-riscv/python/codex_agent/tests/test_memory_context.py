@@ -134,10 +134,10 @@ class ContextTests(unittest.TestCase):
         async def check():
             r, sources = fixture()
             with tempfile.TemporaryDirectory() as temp:
-                root = Path(temp); db = root / "memory.sqlite3"
-                with MemoryStore(db) as store:
+                root = Path(temp)
+                with MemoryStore(root) as store:
                     store.add(record_from_validation_receipt(r, sources=sources))
-                env = {"TRITON_RISCV_REPO_ROOT":str(root), "TRITON_RISCV_MEMORY_DB":str(db),
+                env = {"TRITON_RISCV_REPO_ROOT":str(root),
                        "TRITON_RISCV_EMBEDDING_PROVIDER":"none", "TRITON_RISCV_MEMORY_RETRIEVAL_MODE":"legacy",
                        "TRITON_RISCV_MEMORY_CONTEXT_FORMAT":"compact"}
                 with patch.dict(os.environ, env):

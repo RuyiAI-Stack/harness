@@ -6,13 +6,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import re
-import sqlite3
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Iterable
+from sqlalchemy import func, select
+
+from codex_agent.storage.database import WorkspaceDatabase
+from codex_agent.storage.cache import ReadCache
+from codex_agent.runtime_config import runtime_config
+from codex_agent.storage.schema import memories as memory_table, chunks as chunk_table
 
 from .embeddings import EmbeddingProvider, build_embedding_provider, cosine_similarity
 from .memory_selection import CandidateStrategy, select_candidates
@@ -298,124 +302,49 @@ def positive_ranks(candidates: list[dict], score_key: str) -> dict[int, int]:
 
 
 class MemoryStore:
-    """SQLite-backed memory store with soft archival and optional embeddings."""
+    """MySQL-backed memories scoped to one canonical workspace (not a file path)."""
 
-    def __init__(
-        self,
-        path: Path,
-        embedding_provider: EmbeddingProvider | None = None,
-    ) -> None:
-        self.path = path
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, workspace: Path, embedding_provider: EmbeddingProvider | None = None):
+        self.db = WorkspaceDatabase(workspace)
+        self.db.register()
         self.embedding_provider = embedding_provider
-        self.connection = sqlite3.connect(path)
-        self.connection.row_factory = sqlite3.Row
-        self._initialize()
+        self.cache = ReadCache(self.db)
 
-    def close(self) -> None:
-        connection = getattr(self, "connection", None)
-        if connection is not None:
-            connection.close()
-            self.connection = None
+    def close(self):
+        # Connections belong to bounded process-local pools, not this store.
+        pass
 
-    def __del__(self) -> None:
-        try:
-            self.close()
-        except Exception:
-            pass
-
-    def __enter__(self) -> "MemoryStore":
+    def __enter__(self):
         return self
 
-    def __exit__(self, *_args: object) -> None:
+    def __exit__(self, *_args):
         self.close()
 
-    def _initialize(self) -> None:
-        self.connection.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS metadata (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS memories (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                fingerprint TEXT NOT NULL UNIQUE,
-                memory_type TEXT NOT NULL,
-                operator TEXT NOT NULL,
-                semantics TEXT NOT NULL,
-                pytorch_reference TEXT NOT NULL,
-                tl_ops_json TEXT NOT NULL,
-                failure_stage TEXT,
-                error_signature TEXT,
-                environment_json TEXT NOT NULL,
-                summary TEXT NOT NULL,
-                searchable_text TEXT NOT NULL,
-                outcome TEXT NOT NULL,
-                evidence_json TEXT NOT NULL,
-                confidence_grade TEXT NOT NULL,
-                confidence REAL NOT NULL,
-                source_run TEXT NOT NULL,
-                test_sha256 TEXT,
-                active INTEGER NOT NULL DEFAULT 1,
-                archive_reason TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                last_used_at TEXT,
-                useful_count INTEGER NOT NULL DEFAULT 0,
-                embedding_json TEXT,
-                embedding_provider TEXT,
-                embedding_model TEXT,
-                embedding_dim INTEGER
-            );
-            CREATE INDEX IF NOT EXISTS idx_memories_active ON memories(active);
-            CREATE INDEX IF NOT EXISTS idx_memories_operator ON memories(operator);
-            CREATE INDEX IF NOT EXISTS idx_memories_stage ON memories(failure_stage);
-            CREATE INDEX IF NOT EXISTS idx_memories_error ON memories(error_signature);
-            CREATE TABLE IF NOT EXISTS memory_chunks (
-                memory_id INTEGER NOT NULL,
-                kind TEXT NOT NULL,
-                position INTEGER NOT NULL,
-                text TEXT NOT NULL,
-                source_field TEXT NOT NULL DEFAULT '',
-                embedding_json TEXT,
-                embedding_provider TEXT,
-                embedding_model TEXT,
-                embedding_dim INTEGER,
-                PRIMARY KEY (memory_id, kind, position)
-            );
-            CREATE INDEX IF NOT EXISTS idx_memory_chunks_memory ON memory_chunks(memory_id);
-            """
-        )
-        columns = {
-            row["name"] for row in self.connection.execute("PRAGMA table_info(memory_chunks)")
-        }
-        if "source_field" not in columns:
-            self.connection.execute(
-                "ALTER TABLE memory_chunks ADD COLUMN source_field TEXT NOT NULL DEFAULT ''"
-            )
-        previous = self.connection.execute(
-            "SELECT value FROM metadata WHERE key = 'schema_version'"
-        ).fetchone()
-        if previous and int(previous["value"]) < SCHEMA_VERSION:
-            # Parent records remain untouched. Old vectors refer to a different chunk layout.
-            self.connection.execute("DELETE FROM memory_chunks")
-            self.connection.execute(
-                "UPDATE memories SET embedding_json = NULL, embedding_provider = NULL, "
-                "embedding_model = NULL, embedding_dim = NULL"
-            )
-        missing = self.connection.execute(
-            """SELECT * FROM memories WHERE NOT EXISTS
-               (SELECT 1 FROM memory_chunks WHERE memory_chunks.memory_id = memories.id)"""
-        ).fetchall()
-        for row in missing:
-            self._insert_chunks(row["id"], memory_chunks(self._row_dict(row)))
-        self.connection.execute(
-            "INSERT OR REPLACE INTO metadata(key, value) VALUES('schema_version', ?)",
-            (str(SCHEMA_VERSION),),
-        )
-        self.connection.commit()
+    def _stored(self, *, active_only=False, connection=None):
+        conditions = [memory_table.c.active == 1] if active_only else []
+        return self.db.rows(memory_table, *conditions, order=(memory_table.c.id,), connection=connection)
 
-    def _embedding_for(self, text: str) -> list[float] | None:
+    def chunk_rows(self, memory_id=None, *, connection=None):
+        conditions = [] if memory_id is None else [chunk_table.c.memory_id == memory_id]
+        return self.db.rows(chunk_table, *conditions,
+            order=(chunk_table.c.memory_id, chunk_table.c.kind, chunk_table.c.position), connection=connection)
+
+    def get(self, memory_id):
+        if type(memory_id) is not int or memory_id <= 0:
+            raise ValueError("memory_id must be a positive integer")
+        def load():
+            rows = self.db.rows(memory_table, memory_table.c.id == memory_id, memory_table.c.active == 1)
+            return self._row_dict(rows[0]) if rows else None
+        return self.cache.get("detail", {"id": memory_id}, load, exact_id=memory_id)
+
+    def warm_cache_ids(self):
+        def identifiers():
+            with self.db.transaction() as conn:
+                return list(conn.execute(select(memory_table.c.id).where(
+                    *self.db.predicate(memory_table, memory_table.c.active == 1))).scalars())
+        return self.cache.warm_bloom(identifiers)
+
+    def _embedding_for(self, text):
         if self.embedding_provider is None:
             return None
         if self.embedding_provider.count_tokens(text) > self.embedding_provider.max_input_tokens:
@@ -425,189 +354,122 @@ class MemoryStore:
             raise RuntimeError("embedding provider returned no vector")
         return vectors[0]
 
-    def _insert_chunks(
-        self,
-        memory_id: int,
-        chunks: list[MemoryChunk],
-        vectors: list[list[float]] | None = None,
-    ) -> None:
-        for index, chunk in enumerate(chunks):
-            vector = vectors[index] if vectors is not None else None
-            self.connection.execute(
-                """INSERT OR REPLACE INTO memory_chunks
-                   (memory_id, kind, position, text, source_field, embedding_json,
-                    embedding_provider, embedding_model, embedding_dim)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    memory_id, chunk.kind, chunk.position, chunk.text,
-                    chunk.source_field,
-                    json.dumps(vector) if vector else None,
-                    self.embedding_provider.name if vector else None,
-                    self.embedding_provider.model if vector else None,
-                    len(vector) if vector else None,
-                ),
-            )
-
-    def _chunk_policy(self) -> ChunkPolicy:
+    def _chunk_policy(self):
         if self.embedding_provider is None:
             return ChunkPolicy()
-        # The model's tokenizer is mandatory for vector indexing. Count the
-        # title and special tokens as part of every input, not just the body.
         maximum = self.embedding_provider.max_input_tokens
         limit = min(180, maximum)
         return ChunkPolicy(max_tokens=limit, overlap_tokens=min(24, limit // 6))
 
-    def _case_chunks(self, item: dict) -> list[MemoryChunk]:
-        return memory_chunks(
-            item,
+    def _case_chunks(self, item):
+        return memory_chunks(item,
             token_count=self.embedding_provider.count_tokens if self.embedding_provider else None,
-            policy=self._chunk_policy(),
-        )
+            policy=self._chunk_policy())
 
-    def rebuild_chunks(self) -> int:
-        """Rebuild child chunks from stored parents without changing parent IDs."""
-        rows = self.connection.execute("SELECT * FROM memories ORDER BY id").fetchall()
+    def _insert_chunks(self, conn, memory_id, chunks, vectors=None):
+        for index, chunk in enumerate(chunks):
+            vector = vectors[index] if vectors is not None else None
+            self.db.insert(conn, chunk_table, dict(memory_id=memory_id, kind=chunk.kind,
+                position=chunk.position, text=chunk.text, source_field=chunk.source_field,
+                embedding_json=json.dumps(vector) if vector else None,
+                embedding_provider=self.embedding_provider.name if vector else None,
+                embedding_model=self.embedding_provider.model if vector else None,
+                embedding_dim=len(vector) if vector else None))
+
+    def rebuild_chunks(self):
         changed = 0
-        with self.connection:
-            for row in rows:
-                item = self._row_dict(row)
-                chunks = self._case_chunks(item)
-                existing = self.connection.execute(
-                    "SELECT kind, position, text, source_field FROM memory_chunks WHERE memory_id = ? ORDER BY kind, position",
-                    (row["id"],),
-                ).fetchall()
-                old = [(part["kind"], part["position"], part["text"], part["source_field"]) for part in existing]
-                new = sorted((part.kind, part.position, part.text, part.source_field) for part in chunks)
-                if old == new:
-                    continue
-                changed += 1
-                self.connection.execute("DELETE FROM memory_chunks WHERE memory_id = ?", (row["id"],))
-                self._insert_chunks(row["id"], chunks)
+        with self.db.transaction() as conn:
+            self.db.lock(conn, "memory-write")
+            for row in self._stored(connection=conn):
+                chunks = self._case_chunks(self._row_dict(row))
+                existing = self.chunk_rows(row["id"], connection=conn)
+                before = [(c["kind"], c["position"], c["text"], c["source_field"]) for c in existing]
+                after = sorted((c.kind, c.position, c.text, c.source_field) for c in chunks)
+                if before != after:
+                    self.db.delete(conn, chunk_table, chunk_table.c.memory_id == row["id"])
+                    self._insert_chunks(conn, row["id"], chunks)
+                    changed += 1
         return changed
 
-    def add(self, record: MemoryRecord) -> tuple[int, bool]:
+    def add(self, record):
         record = record.normalized()
         fingerprint = memory_fingerprint(record)
         now = utc_timestamp()
-        existing = self.connection.execute(
-            "SELECT id FROM memories WHERE fingerprint = ?", (fingerprint,)
-        ).fetchone()
-        if existing:
-            old = self._row_dict(self.connection.execute(
-                "SELECT * FROM memories WHERE id = ?", (existing["id"],)
-            ).fetchone())
-            if any(old[key] != getattr(record, key) for key in (
-                "semantics", "pytorch_reference", "summary", "outcome", "evidence", "environment", "source_run", "tl_ops"
-            )):
-                refreshed_chunks = self._case_chunks(asdict(record))
-                searchable = record.searchable_text()
-                full_vector = None
-                chunk_vectors = None
-                if self.embedding_provider:
-                    full_ok = self.embedding_provider.count_tokens(searchable) <= self.embedding_provider.max_input_tokens
-                    vectors = self.embedding_provider.embed(
-                        ([searchable] if full_ok else [])
-                        + [embedding_input(record.operator, chunk) for chunk in refreshed_chunks]
-                    )
-                    if len(vectors) != int(full_ok) + len(refreshed_chunks) or any(not vector for vector in vectors):
-                        raise RuntimeError("embedding provider returned invalid vectors")
-                    full_vector = vectors[0] if full_ok else None
-                    chunk_vectors = vectors[int(full_ok):]
-                self.connection.execute(
-                    """UPDATE memories SET semantics = ?, pytorch_reference = ?,
-                       summary = ?, outcome = ?, evidence_json = ?, searchable_text = ?,
-                       embedding_json = ?, embedding_provider = ?, embedding_model = ?,
-                       embedding_dim = ?
-                       WHERE id = ?""",
-                    (record.semantics, record.pytorch_reference, record.summary,
-                     record.outcome, json.dumps(record.evidence, sort_keys=True),
-                     searchable, json.dumps(full_vector) if full_vector else None,
-                     self.embedding_provider.name if full_vector else None,
-                     self.embedding_provider.model if full_vector else None,
-                     len(full_vector) if full_vector else None, existing["id"]),
-                )
-                self.connection.execute("DELETE FROM memory_chunks WHERE memory_id = ?", (existing["id"],))
-                self._insert_chunks(existing["id"], refreshed_chunks, chunk_vectors)
-            self.connection.execute(
-                "UPDATE memories SET updated_at = ?, active = 1, archive_reason = NULL, "
-                "environment_json = ?, source_run = ?, tl_ops_json = ? WHERE id = ?",
-                (now, json.dumps(record.environment, sort_keys=True), record.source_run,
-                 json.dumps(record.tl_ops), existing["id"]),
-            )
-            self.connection.commit()
-            return int(existing["id"]), False
+        refresh = {"active": 1, "archive_reason": None, "updated_at": now}
 
+        def unchanged(row):
+            old = self._row_dict(row)
+            return all(old[key] == getattr(record, key) for key in (
+                "semantics", "pytorch_reference", "summary", "outcome", "evidence",
+                "environment", "source_run", "tl_ops",
+            ))
+
+        if self.embedding_provider:
+            # Check duplicates before spending any embedding calls; no model call holds a lock.
+            with self.db.transaction() as conn:
+                self.db.lock(conn, "memory-write")
+                existing = self.db.rows(memory_table, memory_table.c.fingerprint == fingerprint,
+                                        connection=conn, lock=True)
+                if existing and unchanged(existing[0]):
+                    memory_id = existing[0]["id"]
+                    self.db.update(conn, memory_table, refresh, memory_table.c.id == memory_id)
+                    return memory_id, False
         searchable = record.searchable_text()
         chunks = self._case_chunks(asdict(record))
-        full_text_embeddable = (
-            self.embedding_provider is not None
-            and self.embedding_provider.count_tokens(searchable) <= self.embedding_provider.max_input_tokens
-        )
-        vectors = (
-            self.embedding_provider.embed(
-                ([searchable] if full_text_embeddable else [])
-                + [embedding_input(record.operator, chunk) for chunk in chunks]
-            ) if self.embedding_provider else None
-        )
-        if vectors is not None and (
-            len(vectors) != int(full_text_embeddable) + len(chunks)
-            or any(not vector for vector in vectors)
-        ):
+        full_ok = (self.embedding_provider is not None
+                   and self.embedding_provider.count_tokens(searchable) <= self.embedding_provider.max_input_tokens)
+        vectors = self.embedding_provider.embed(
+            ([searchable] if full_ok else []) +
+            [embedding_input(record.operator, chunk) for chunk in chunks]
+        ) if self.embedding_provider else None
+        if vectors is not None and (len(vectors) != int(full_ok) + len(chunks) or any(not v for v in vectors)):
             raise RuntimeError("embedding provider returned invalid vectors")
-        vector = vectors[0] if vectors and full_text_embeddable else None
-        provider_name = self.embedding_provider.name if vector else None
-        provider_model = self.embedding_provider.model if vector else None
-        cursor = self.connection.execute(
-            """
-            INSERT INTO memories(
-                fingerprint, memory_type, operator, semantics, pytorch_reference,
-                tl_ops_json, failure_stage, error_signature, environment_json,
-                summary, searchable_text, outcome, evidence_json, confidence_grade,
-                confidence, source_run, test_sha256, created_at, updated_at,
-                embedding_json, embedding_provider, embedding_model, embedding_dim
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                fingerprint,
-                record.memory_type,
-                record.operator,
-                record.semantics,
-                record.pytorch_reference,
-                json.dumps(record.tl_ops, sort_keys=True),
-                record.failure_stage,
-                record.error_signature,
-                json.dumps(record.environment, sort_keys=True),
-                record.summary,
-                searchable,
-                record.outcome,
-                json.dumps(record.evidence, sort_keys=True),
-                record.confidence_grade,
-                GRADE_CONFIDENCE[record.confidence_grade],
-                record.source_run,
-                record.test_sha256,
-                now,
-                now,
-                json.dumps(vector) if vector else None,
-                provider_name,
-                provider_model,
-                len(vector) if vector else None,
-            ),
-        )
-        memory_id = int(cursor.lastrowid)
-        self._insert_chunks(memory_id, chunks, vectors[int(full_text_embeddable):] if vectors else None)
-        self.connection.commit()
-        return memory_id, True
+        vector = vectors[0] if vectors and full_ok else None
+        values = asdict(record)
+        for source, target in (("tl_ops", "tl_ops_json"), ("environment", "environment_json"),
+                               ("evidence", "evidence_json")):
+            values[target] = json.dumps(values.pop(source), sort_keys=True)
+        values.update(fingerprint=fingerprint, searchable_text=searchable,
+            confidence=GRADE_CONFIDENCE[record.confidence_grade], updated_at=now,
+            active=1, archive_reason=None, embedding_json=json.dumps(vector) if vector else None,
+            embedding_provider=self.embedding_provider.name if vector else None,
+            embedding_model=self.embedding_provider.model if vector else None,
+            embedding_dim=len(vector) if vector else None)
+        # Compute embeddings before locking. Parent/chunks become visible atomically.
+        with self.db.transaction() as conn:
+            self.db.lock(conn, "memory-write")
+            existing = self.db.rows(memory_table, memory_table.c.fingerprint == values["fingerprint"],
+                                    connection=conn, lock=True)
+            created = not existing
+            if existing:
+                memory_id = existing[0]["id"]
+                if unchanged(existing[0]):
+                    # Re-ingesting unchanged evidence must not discard its vectors.
+                    self.db.update(conn, memory_table, refresh, memory_table.c.id == memory_id)
+                    return memory_id, False
+                update_fields = {key: values[key] for key in (
+                    "semantics", "pytorch_reference", "summary", "outcome", "evidence_json",
+                    "searchable_text", "environment_json", "source_run", "tl_ops_json",
+                    "embedding_json", "embedding_provider", "embedding_model", "embedding_dim",
+                )}
+                self.db.update(conn, memory_table, {**update_fields, **refresh}, memory_table.c.id == memory_id)
+                self.db.delete(conn, chunk_table, chunk_table.c.memory_id == memory_id)
+            else:
+                memory_id = self.db.allocate(conn, "memories")
+                self.db.insert(conn, memory_table, dict(id=memory_id, created_at=now, **values))
+            self._insert_chunks(conn, memory_id, chunks, vectors[int(full_ok):] if vectors else None)
+        return memory_id, created
 
-    def archive(self, memory_id: int, reason: str) -> bool:
-        cursor = self.connection.execute(
-            "UPDATE memories SET active = 0, archive_reason = ?, updated_at = ? WHERE id = ?",
-            (normalize_text(reason), utc_timestamp(), memory_id),
-        )
-        self.connection.commit()
-        return cursor.rowcount > 0
+    def archive(self, memory_id, reason):
+        with self.db.transaction() as conn:
+            return self.db.update(conn, memory_table,
+                {"active": 0, "archive_reason": normalize_text(reason), "updated_at": utc_timestamp()},
+                memory_table.c.id == memory_id).rowcount > 0
 
-    def _row_dict(self, row: sqlite3.Row) -> dict:
+    @staticmethod
+    def _row_dict(row: dict) -> dict:
         item = dict(row)
+        item.pop("workspace_id", None)
         for source, destination in (
             ("tl_ops_json", "tl_ops"),
             ("environment_json", "environment"),
@@ -619,12 +481,8 @@ class MemoryStore:
         item["active"] = bool(item["active"])
         return item
 
-    def list(self, *, active_only: bool = True) -> list[dict]:
-        where = "WHERE active = 1" if active_only else ""
-        rows = self.connection.execute(
-            f"SELECT * FROM memories {where} ORDER BY id"
-        ).fetchall()
-        return [self._row_dict(row) for row in rows]
+    def list(self, *, active_only=True):
+        return [self._row_dict(row) for row in self._stored(active_only=active_only)]
 
     def retrieve(
         self,
@@ -639,18 +497,26 @@ class MemoryStore:
     ) -> list[dict]:
         if limit <= 0:
             return []
-        candidates = self.rank_candidates(
-            query, exclude_source_runs=exclude_source_runs,
-            score_mode=score_mode, lexical_weight=lexical_weight,
-        )
-        selected = select_candidates(candidates, limit, strategy=candidate_strategy, trace=selection_trace)
+        excluded = sorted(set(exclude_source_runs))
+        parameters = {"query": asdict(query), "limit": limit, "excluded": excluded,
+            "mode": score_mode, "weight": lexical_weight, "strategy": candidate_strategy,
+            "embedding": runtime_config().memory.embedding.model_dump(),
+            "provider": [getattr(self.embedding_provider, key, None)
+                         for key in ("name", "model", "max_input_tokens")]}
+        def load():
+            trace = {}
+            candidates = self.rank_candidates(query, exclude_source_runs=excluded,
+                score_mode=score_mode, lexical_weight=lexical_weight)
+            items = select_candidates(candidates, limit, strategy=candidate_strategy, trace=trace)
+            return {"items": items, "trace": trace}
+        result = self.cache.get("retrieval", parameters, load)
+        selected = result["items"]
+        if selection_trace is not None:
+            selection_trace.update(result["trace"])
         now = utc_timestamp()
-        for item in selected:
-            self.connection.execute(
-                "UPDATE memories SET last_used_at = ? WHERE id = ?",
-                (now, item["id"]),
-            )
-        self.connection.commit()
+        with self.db.transaction() as conn:
+            for item in selected:
+                self.db.update(conn, memory_table, {"last_used_at": now}, memory_table.c.id == item["id"])
         return selected
 
     def rank_candidates(
@@ -668,15 +534,13 @@ class MemoryStore:
             raise ValueError("lexical_weight must be between 0 and 1")
         if score_mode in {"embedding", "fusion"} and self.embedding_provider is None:
             raise RuntimeError(f"{score_mode} retrieval requires an embedding provider")
-        rows = self.connection.execute(
-            "SELECT * FROM memories WHERE active = 1 ORDER BY id"
-        ).fetchall()
+        rows = self._stored(active_only=True)
         query_tokens = tokens(query.searchable_text())
         query_ops = set(query.tl_ops)
         query_stage = canonical_stage(query.failure_stage)
         query_vector = self._embedding_for(query.searchable_text()) if score_mode == "legacy" else None
         query_vectors: list[tuple[str, list[float]]] = []
-        chunks_by_memory: dict[int, list[sqlite3.Row]] = {}
+        chunks_by_memory: dict[int, list[dict]] = {}
         if score_mode in {"embedding", "fusion"}:
             policy = self._chunk_policy()
             sections = query_embedding_sections(
@@ -688,11 +552,8 @@ class MemoryStore:
             if len(section_vectors) != len(sections) or any(not vector for vector in section_vectors):
                 raise RuntimeError("embedding provider returned invalid query vectors")
             query_vectors = [(kind, vector) for (kind, _), vector in zip(sections, section_vectors)]
-            chunk_rows = self.connection.execute(
-                """SELECT memory_chunks.* FROM memory_chunks
-                   JOIN memories ON memories.id = memory_chunks.memory_id
-                   WHERE memories.active = 1 ORDER BY memory_id, kind, position"""
-            ).fetchall()
+            active_ids = {row["id"] for row in rows}
+            chunk_rows = [chunk for chunk in self.chunk_rows() if chunk["memory_id"] in active_ids]
             for chunk in chunk_rows:
                 chunks_by_memory.setdefault(chunk["memory_id"], []).append(chunk)
         excluded = {normalize_text(item) for item in exclude_source_runs if item}
@@ -809,12 +670,11 @@ class MemoryStore:
 
         return [item for _score, item in sorted(scored, key=lambda pair: (-pair[0], pair[1]["id"]))]
 
-    def mark_useful(self, memory_id: int) -> None:
-        self.connection.execute(
-            "UPDATE memories SET useful_count = useful_count + 1, updated_at = ? WHERE id = ?",
-            (utc_timestamp(), memory_id),
-        )
-        self.connection.commit()
+    def mark_useful(self, memory_id):
+        with self.db.transaction() as conn:
+            self.db.update(conn, memory_table,
+                {"useful_count": memory_table.c.useful_count + 1, "updated_at": utc_timestamp()},
+                memory_table.c.id == memory_id)
 
     def maintain(self, low_confidence_days: int = 90) -> dict:
         """Soft-archive stale low-confidence and superseded diagnostic records."""
@@ -869,109 +729,63 @@ class MemoryStore:
                     )
         return {"archived": len(archived), "items": archived}
 
-    def embed_missing(self, batch_size: int = 32) -> dict:
+    def embed_missing(self, batch_size=32):
         if self.embedding_provider is None:
             raise RuntimeError("embedding provider is not configured")
         if batch_size < 1:
             raise ValueError("batch_size must be positive")
-        self._chunk_policy()
         self.rebuild_chunks()
-        rows = self.connection.execute(
-            """SELECT id, searchable_text FROM memories WHERE active = 1
-               AND (embedding_json IS NULL OR embedding_provider IS NOT ?
-                    OR embedding_model IS NOT ?) ORDER BY id""",
-            (self.embedding_provider.name, self.embedding_provider.model),
-        ).fetchall()
-        rows = [row for row in rows if self.embedding_provider.count_tokens(row["searchable_text"]) <= self.embedding_provider.max_input_tokens]
-        chunk_rows = self.connection.execute(
-            """SELECT memory_chunks.memory_id, memory_chunks.kind,
-                      memory_chunks.position, memory_chunks.text,
-                      memory_chunks.source_field, memories.operator
-               FROM memory_chunks JOIN memories ON memories.id = memory_chunks.memory_id
-               WHERE memories.active = 1 AND
-                     (memory_chunks.embedding_json IS NULL OR
-                      memory_chunks.embedding_provider IS NOT ? OR
-                      memory_chunks.embedding_model IS NOT ?)
-               ORDER BY memory_id, kind, position""",
-            (self.embedding_provider.name, self.embedding_provider.model),
-        ).fetchall()
-        for offset in range(0, len(rows), batch_size):
-            batch = rows[offset:offset + batch_size]
-            vectors = self.embedding_provider.embed([row["searchable_text"] for row in batch])
-            if len(vectors) != len(batch) or any(not vector for vector in vectors):
-                raise RuntimeError("embedding provider returned invalid vectors")
-            for row, vector in zip(batch, vectors):
-                self.connection.execute(
-                    """
-                    UPDATE memories SET embedding_json = ?, embedding_provider = ?,
-                        embedding_model = ?, embedding_dim = ? WHERE id = ?
-                    """,
-                    (
-                        json.dumps(vector),
-                        self.embedding_provider.name,
-                        self.embedding_provider.model,
-                        len(vector),
-                        row["id"],
-                    ),
-                )
-            self.connection.commit()
-        for offset in range(0, len(chunk_rows), batch_size):
-            batch = chunk_rows[offset:offset + batch_size]
-            inputs = [
-                chunk_title(row["operator"], row["kind"], row["source_field"]) + row["text"]
-                for row in batch
-            ]
-            if any(self.embedding_provider.count_tokens(text) > self._chunk_policy().max_tokens for text in inputs):
-                raise RuntimeError("chunk exceeds embedding token budget after title")
-            vectors = self.embedding_provider.embed(inputs)
-            if len(vectors) != len(batch) or any(not vector for vector in vectors):
-                raise RuntimeError("embedding provider returned invalid chunk vectors")
-            for row, vector in zip(batch, vectors):
-                self.connection.execute(
-                    """UPDATE memory_chunks SET embedding_json = ?,
-                       embedding_provider = ?, embedding_model = ?, embedding_dim = ?
-                       WHERE memory_id = ? AND kind = ? AND position = ?""",
-                    (
-                        json.dumps(vector), self.embedding_provider.name,
-                        self.embedding_provider.model, len(vector),
-                        row["memory_id"], row["kind"], row["position"],
-                    ),
-                )
-            self.connection.commit()
-        return {
-            "embedded": len(rows),
-            "embedded_chunks": len(chunk_rows),
-            "provider": self.embedding_provider.name,
-            "model": self.embedding_provider.model,
-        }
+        provider = self.embedding_provider
+        def missing(row):
+            return (row["embedding_json"] is None or row["embedding_provider"] != provider.name
+                    or row["embedding_model"] != provider.model)
+        active = self._stored(active_only=True)
+        parents = {row["id"]: row for row in active}
+        rows = [row for row in active if missing(row)
+                and provider.count_tokens(row["searchable_text"]) <= provider.max_input_tokens]
+        chunks = [row for row in self.chunk_rows() if row["memory_id"] in parents and missing(row)]
+        for group, table, is_chunk in ((rows, memory_table, False), (chunks, chunk_table, True)):
+            for offset in range(0, len(group), batch_size):
+                batch = group[offset:offset + batch_size]
+                inputs = [chunk_title(parents[row["memory_id"]]["operator"], row["kind"], row["source_field"]) + row["text"]
+                          if is_chunk else row["searchable_text"] for row in batch]
+                if is_chunk and any(provider.count_tokens(t) > self._chunk_policy().max_tokens for t in inputs):
+                    raise RuntimeError("chunk exceeds embedding token budget after title")
+                vectors = provider.embed(inputs)
+                if len(vectors) != len(batch) or any(not vector for vector in vectors):
+                    raise RuntimeError("embedding provider returned invalid vectors")
+                with self.db.transaction() as conn:
+                    self.db.lock(conn, "memory-write")
+                    for row, vector in zip(batch, vectors):
+                        conditions = ([table.c.memory_id == row["memory_id"], table.c.kind == row["kind"],
+                                       table.c.position == row["position"], table.c.text == row["text"],
+                                       table.c.source_field == row["source_field"]]
+                                      if is_chunk else [table.c.id == row["id"],
+                                                        table.c.searchable_text == row["searchable_text"]])
+                        self.db.update(conn, table, dict(embedding_json=json.dumps(vector),
+                            embedding_provider=provider.name, embedding_model=provider.model,
+                            embedding_dim=len(vector)), *conditions)
+        return {"embedded": len(rows), "embedded_chunks": len(chunks),
+                "provider": provider.name, "model": provider.model}
 
-    def stats(self) -> dict:
-        rows = self.connection.execute(
-            "SELECT memory_type, active, COUNT(*) AS count FROM memories GROUP BY memory_type, active"
-        ).fetchall()
-        total = self.connection.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
-        embedded = self.connection.execute(
-            "SELECT COUNT(*) FROM memories WHERE embedding_json IS NOT NULL"
-        ).fetchone()[0]
-        embedded_chunks = self.connection.execute(
-            "SELECT COUNT(*) FROM memory_chunks WHERE embedding_json IS NOT NULL"
-        ).fetchone()[0]
-        return {
-            "schema_version": SCHEMA_VERSION,
-            "total": total,
-            "active": sum(row["count"] for row in rows if row["active"]),
-            "archived": sum(row["count"] for row in rows if not row["active"]),
-            "embedded": embedded,
-            "embedded_chunks": embedded_chunks,
-            "by_type": {
-                row["memory_type"]: sum(
-                    candidate["count"]
-                    for candidate in rows
-                    if candidate["memory_type"] == row["memory_type"] and candidate["active"]
-                )
-                for row in rows
-            },
-        }
+    def stats(self):
+        return self.cache.get("stats", {}, self._stats)
+
+    def _stats(self):
+        with self.db.transaction() as conn:
+            rows = list(conn.execute(select(memory_table.c.memory_type, memory_table.c.active,
+                func.count().label("count")).where(*self.db.predicate(memory_table)).group_by(
+                    memory_table.c.memory_type, memory_table.c.active)).mappings())
+            embedded = conn.execute(select(func.count()).select_from(memory_table).where(
+                *self.db.predicate(memory_table, memory_table.c.embedding_json.is_not(None)))).scalar_one()
+            embedded_chunks = conn.execute(select(func.count()).select_from(chunk_table).where(
+                *self.db.predicate(chunk_table, chunk_table.c.embedding_json.is_not(None)))).scalar_one()
+        return {"schema_version": SCHEMA_VERSION, "total": sum(r["count"] for r in rows),
+                "active": sum(r["count"] for r in rows if r["active"]),
+                "archived": sum(r["count"] for r in rows if not r["active"]),
+                "embedded": embedded, "embedded_chunks": embedded_chunks,
+                "by_type": {kind: sum(r["count"] for r in rows if r["memory_type"] == kind and r["active"])
+                            for kind in {r["memory_type"] for r in rows}}}
 
 
 def environment_summary(environment: dict, final: dict) -> dict:
@@ -1288,7 +1102,7 @@ def build_provider_from_args(args: argparse.Namespace) -> EmbeddingProvider | No
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Manage Triton-RISCV agent memory.")
-    parser.add_argument("--db", default="agent-results/memory.sqlite3")
+    parser.add_argument("--workspace", type=Path, default=Path.cwd(), help="Target workspace in MySQL")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     ingest = subparsers.add_parser("ingest", help="Import completed development runs.")
@@ -1310,6 +1124,11 @@ def parse_args() -> argparse.Namespace:
 
     stats_parser = subparsers.add_parser("stats", help="Print memory statistics.")
     add_embedding_arguments(stats_parser)
+    detail = subparsers.add_parser("show", help="Read one active historical case.")
+    detail.add_argument("memory_id", type=int)
+    add_embedding_arguments(detail)
+    warm = subparsers.add_parser("warm-cache-ids", help="Build an optional revision-scoped Bloom filter.")
+    add_embedding_arguments(warm)
 
     archive = subparsers.add_parser("archive", help="Soft-archive one memory.")
     archive.add_argument("memory_id", type=int)
@@ -1332,7 +1151,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     provider = build_provider_from_args(args)
-    with MemoryStore(Path(args.db), provider) as store:
+    with MemoryStore(args.workspace, provider) as store:
         if args.command == "ingest":
             result = ingest_results(store, Path(args.results_dir))
         elif args.command == "search":
@@ -1352,6 +1171,10 @@ def main() -> int:
             )
         elif args.command == "archive":
             result = {"archived": store.archive(args.memory_id, args.reason)}
+        elif args.command == "show":
+            result = store.get(args.memory_id)
+        elif args.command == "warm-cache-ids":
+            result = store.warm_cache_ids()
         elif args.command == "embed-missing":
             result = store.embed_missing()
         elif args.command == "rebuild-chunks":
