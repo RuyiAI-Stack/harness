@@ -73,10 +73,6 @@ jobs:
         options: >-
           --health-cmd="rabbitmq-diagnostics -q ping"
           --health-interval=10s --health-timeout=5s --health-retries=12
-    env:
-      TRITON_MYSQL_URL: mysql+pymysql://root:ci-only-password@127.0.0.1:${{ job.services.mysql.ports[3306] }}/triton_agent_test
-      TRITON_TEST_REDIS_URL: redis://127.0.0.1:${{ job.services.redis.ports[6379] }}/0
-      TRITON_TEST_AMQP_URL: amqp://ci:ci-only-password@127.0.0.1:${{ job.services.rabbitmq.ports[5672] }}/
     steps:
       - name: Checkout harness
         uses: actions/checkout@v4
@@ -101,7 +97,13 @@ jobs:
         run: ./tools/scripts/install-all.sh
 
       - name: Prepare disposable plugin database
+        env:
+          TRITON_MYSQL_URL: mysql+pymysql://root:ci-only-password@127.0.0.1:${{ job.services.mysql.ports['3306'] }}/triton_agent_test
         run: packages/dsh-triton-riscv/.venv/bin/python -I -m codex_agent.storage upgrade
 
       - name: Run tests
+        env:
+          TRITON_MYSQL_URL: mysql+pymysql://root:ci-only-password@127.0.0.1:${{ job.services.mysql.ports['3306'] }}/triton_agent_test
+          TRITON_TEST_REDIS_URL: redis://127.0.0.1:${{ job.services.redis.ports['6379'] }}/0
+          TRITON_TEST_AMQP_URL: amqp://ci:ci-only-password@127.0.0.1:${{ job.services.rabbitmq.ports['5672'] }}/
         run: pnpm test:all --reporter=verbose
