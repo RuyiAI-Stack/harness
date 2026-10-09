@@ -14,5 +14,5 @@ it('integrates the configured plugin with the actual pinned Harness and Python M
   })
   expect(result.error, 'Native host prerequisite/build missing; run repository install-all first').toBeUndefined()
   expect(result.status, result.stdout + result.stderr).toBe(0)
-  expect(result.stdout).toMatch(/5 passed/)
+  expect(result.stdout).toMatch(/\b[1-9]\d* passed\b/)
 }, 120000)

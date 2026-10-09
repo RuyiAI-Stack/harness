@@ -94,14 +94,29 @@ See [backend options](python/codex_agent/README.md#redis-options).
 
 ### Development Tests
 
-From the plugin directory:
-
-Use a disposable MySQL database, export its URL as above, and run the schema
-upgrade before the Python tests. Tests do not require a model API or RISC-V host.
+Vitest drives JavaScript, Python and native-host integration tests. After setup,
+from the plugin directory, configure **disposable** services (never production):
 
 ```sh
+export TRITON_MYSQL_URL='mysql+pymysql://USER:PASSWORD@127.0.0.1:3306/triton_agent_test'
+export TRITON_TEST_REDIS_URL='redis://127.0.0.1:6379/0'
+export TRITON_TEST_AMQP_URL='amqp://guest:guest@127.0.0.1:5672/'
+.venv/bin/python -I -m codex_agent.storage upgrade
 npm test
-.venv/bin/python -m unittest discover -s python/codex_agent/tests -v
+```
+
+Use `npm run test:unit` for JavaScript-only checks or `npm run test:backend` for
+Python tests through Vitest. Python failures, collection errors and timeouts fail
+the Vitest run. Model API keys and a RISC-V server are not required. CI provisions
+its own service containers; private-service restart tests need the optional
+controls described in the backend README and otherwise report skips.
+
+Before pushing, run from the repository root:
+
+```sh
+python3 -m pip install pre-commit
+pre-commit run --all-files
+pnpm test:all
 ```
 
 For trusted local use only. Never commit credentials. Backend development commands are in [python/codex_agent/README.md](python/codex_agent/README.md).

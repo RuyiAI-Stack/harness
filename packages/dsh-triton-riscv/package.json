@@ -62,6 +62,8 @@
     "test:native-host": "node scripts/test-native-host.mjs",
     "check:package": "node scripts/check-package.mjs",
     "test": "vitest run --config vitest.config.ts",
+    "test:unit": "vitest run --config vitest.config.ts tests/unit",
+    "test:backend": "vitest run --config vitest.config.ts tests/integration/python.spec.ts",
     "prepack": "npm run build && npm test && node scripts/check-package.mjs"
   },
   "devDependencies": {

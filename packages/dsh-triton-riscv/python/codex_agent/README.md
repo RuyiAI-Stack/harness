@@ -11,14 +11,17 @@ From `packages/dsh-triton-riscv/` after plugin setup:
 ```sh
 .venv/bin/python -m pip install -e './python[workbench]'
 .venv/bin/python -m codex_agent.storage upgrade
-.venv/bin/python -m unittest discover -s python/codex_agent/tests -v
+npm run test:backend
 ```
 
 To inspect a standalone command, run `.venv/bin/python -I -m codex_agent.operator_agent --help`. Use `-I` with installed CLI tools to avoid importing an older backend from the target checkout.
 
 Generated operators and validation artifacts belong to the target checkout. Credentials, databases, and execution logs are not package source files.
 
-MySQL 8.4 and `TRITON_MYSQL_URL` are required; use a disposable database for tests.
+MySQL 8.4 and `TRITON_MYSQL_URL` are required; use disposable services for tests
+as shown in the [plugin README](../../README.md#development-tests). Vitest runs each
+Python test module with pytest, including both `unittest.TestCase` and function
+tests. It reports Python failures and skips; no separate Python CI job is needed.
 `storage.urlEnv` in the plugin config can name a different credential variable.
 Schema changes are explicit; startup never migrates data or falls back to SQLite.
 
@@ -76,8 +79,8 @@ This version supports standalone Redis, not Redis Cluster. `allkeys-lfu/lru` are
 rejected because the instance also holds locks. Keep services private; use ACLs/TLS
 for remote connections. Do not give database or cache credentials to generated tests.
 
-For integration tests, supply disposable `TRITON_MYSQL_URL` and
-`TRITON_TEST_REDIS_URL`, upgrade the schema, then run `unittest` as above.
+For integration tests, configure all three disposable services from the plugin
+README, upgrade the schema, then run `npm run test:backend`.
 `TRITON_TEST_REDIS_SERVER` enables the real stop/restart test. These tests change
 Redis memory settings; never target a shared service. Cache metrics are available
 through `store.cache.backend.snapshot()` and are process-local, not a monitoring service.
@@ -128,6 +131,6 @@ and state path. It is not a multi-host HA deployment: shared object storage, quo
 queues, authentication, monitoring and retention policies remain deployment work.
 Redis is never the task source of truth. Keep all services private.
 
-Tests require disposable `TRITON_MYSQL_URL` and `TRITON_TEST_AMQP_URL`:
-`python -I -m unittest codex_agent.tests.test_task_queue -v`.
+With the same disposable service configuration, run just the queue module:
+`npm run test:backend -- -t test_task_queue.py`.
 The optional private-broker restart test also needs `TRITON_TEST_RABBITMQ_CTL`.
