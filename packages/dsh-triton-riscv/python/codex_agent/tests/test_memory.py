@@ -16,6 +16,7 @@ from codex_agent.memory import (
     render_memory_context,
     split_chunk_text,
 )
+from codex_agent.storage.schema import chunks as chunk_table
 from codex_agent.memory_chunking import ChunkPolicy, embedding_input
 from codex_agent.embeddings import OpenAICompatibleEmbeddingProvider
 
@@ -69,7 +70,7 @@ def record(**overrides: object) -> MemoryRecord:
 class MemoryTests(unittest.TestCase):
     def test_deduplicates_redacts_and_soft_archives_memory(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "memory.sqlite3"
+            path = Path(temp_dir) / "memory-workspace"
             with MemoryStore(path) as store:
                 first_id, first_created = store.add(
                     record(summary="Successful repair api_key=do-not-store")
@@ -88,7 +89,7 @@ class MemoryTests(unittest.TestCase):
 
     def test_maintenance_archives_superseded_error_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with MemoryStore(Path(temp_dir) / "memory.sqlite3") as store:
+            with MemoryStore(Path(temp_dir) / "memory-workspace") as store:
                 first_id, _ = store.add(
                     record(
                         memory_type="failure-diagnosis",
@@ -118,7 +119,7 @@ class MemoryTests(unittest.TestCase):
 
     def test_structured_and_embedding_retrieval(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "memory.sqlite3"
+            path = Path(temp_dir) / "memory-workspace"
             with MemoryStore(path, FakeEmbeddingProvider()) as store:
                 expected_id, _ = store.add(record())
                 store.add(
@@ -226,7 +227,7 @@ class MemoryTests(unittest.TestCase):
             )
             self.assertTrue(all(item.confidence_grade in {"A", "C"} for item in records))
 
-            with MemoryStore(root / "memory.sqlite3") as store:
+            with MemoryStore(root / "memory-workspace") as store:
                 first = ingest_results(store, root / "development")
                 second = ingest_results(store, root / "development")
                 self.assertEqual(first["added"], 3)
@@ -235,7 +236,7 @@ class MemoryTests(unittest.TestCase):
 
     def test_embeds_existing_lexical_memories_and_limits_prompt_context(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "memory.sqlite3"
+            path = Path(temp_dir) / "memory-workspace"
             with MemoryStore(path) as store:
                 memory_id, _ = store.add(record(summary="exponential formulation " * 100))
                 self.assertEqual(store.stats()["embedded"], 0)
@@ -263,7 +264,7 @@ class MemoryTests(unittest.TestCase):
 
     def test_three_retrieval_modes_require_matching_chunk_embeddings(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "memory.sqlite3"
+            path = Path(temp_dir) / "memory-workspace"
             query = MemoryQuery(
                 operator="tanh_and_mul",
                 semantics="Compute tanh(x) multiplied by y.",
@@ -285,15 +286,15 @@ class MemoryTests(unittest.TestCase):
                     self.assertEqual(result[0]["retrieval"]["mode"], mode)
                 with self.assertRaises(ValueError):
                     store.retrieve(query, score_mode="fusion", lexical_weight=1.5)
-                store.connection.execute("DELETE FROM memory_chunks")
-                store.connection.commit()
+                with store.db.transaction() as conn:
+                    store.db.delete(conn, chunk_table)
             with MemoryStore(path, FakeEmbeddingProvider()) as store:
                 self.assertGreater(store.embed_missing()["embedded_chunks"], 0)
                 self.assertEqual(store.retrieve(query, score_mode="embedding")[0]["id"], expected_id)
 
     def test_old_relevant_case_is_retrieved_after_1000_newer_records(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "memory.sqlite3"
+            path = Path(temp_dir) / "memory-workspace"
             with MemoryStore(path) as store:
                 old_id, _ = store.add(record(
                     operator="old_exact_case",
@@ -322,14 +323,12 @@ class MemoryTests(unittest.TestCase):
 
     def test_short_multiline_evidence_stays_intact_with_source(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with MemoryStore(Path(temp_dir) / "memory.sqlite3") as store:
+            with MemoryStore(Path(temp_dir) / "memory-workspace") as store:
                 memory_id, _ = store.add(record(evidence={
                     "error_excerpt": ["ll.mlir: error: dialect missing\n  linalg.generic\n  ^"],
                 }))
                 item = store.list()[0]
-                chunks = store.connection.execute(
-                    "SELECT * FROM memory_chunks WHERE memory_id = ?", (memory_id,)
-                ).fetchall()
+                chunks = store.chunk_rows(memory_id)
                 excerpt = next(row for row in chunks if row["source_field"] == "evidence.error_excerpt[0]")
                 self.assertIn("\n  linalg.generic\n  ^", excerpt["text"])
                 self.assertEqual(item["evidence"]["error_excerpt"][0],
@@ -422,7 +421,7 @@ class MemoryTests(unittest.TestCase):
 
     def test_retrieval_merges_chunks_by_parent_and_context_contains_key_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with MemoryStore(Path(temp_dir) / "memory.sqlite3", FakeEmbeddingProvider()) as store:
+            with MemoryStore(Path(temp_dir) / "memory-workspace", FakeEmbeddingProvider()) as store:
                 memory_id, _ = store.add(record(evidence={
                     "error_excerpt": ["dialect missing\n  linalg.generic"],
                     "recommended_actions": ["Try lowering to supported operations"],
@@ -446,23 +445,9 @@ class MemoryTests(unittest.TestCase):
                                "source=agent-results/development/run-1"):
                     self.assertIn(phrase, context)
 
-    def test_schema_upgrade_keeps_parent_id_and_rebuilds_children(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "memory.sqlite3"
-            with MemoryStore(path) as store:
-                memory_id, _ = store.add(record())
-                store.connection.execute("UPDATE metadata SET value = '3' WHERE key = 'schema_version'")
-                store.connection.execute("UPDATE memory_chunks SET text = 'old flattened chunk'")
-                store.connection.commit()
-            with MemoryStore(path) as store:
-                self.assertEqual(store.list()[0]["id"], memory_id)
-                self.assertEqual(store.list()[0]["source_run"], "agent-results/development/run-1")
-                self.assertFalse(any(row["text"] == "old flattened chunk" for row in
-                                     store.connection.execute("SELECT text FROM memory_chunks")))
-
     def test_reingest_restores_available_line_breaks_without_new_parent(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
-            with MemoryStore(Path(temp_dir) / "memory.sqlite3") as store:
+            with MemoryStore(Path(temp_dir) / "memory-workspace") as store:
                 old_id, _ = store.add(record(
                     summary="failure at line two",
                     evidence={"error_excerpt": ["failure at line two"]},
@@ -475,31 +460,15 @@ class MemoryTests(unittest.TestCase):
                 self.assertFalse(created)
                 self.assertEqual(store.list()[0]["summary"], "failure at\nline two")
                 self.assertIn("\nline two", " ".join(
-                    row["text"] for row in store.connection.execute(
-                        "SELECT text FROM memory_chunks WHERE memory_id = ?", (old_id,)
-                    )
+                    row["text"] for row in store.chunk_rows(old_id)
                 ))
-
-    def test_version_two_database_without_chunk_table_migrates_parent(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            path = Path(temp_dir) / "memory.sqlite3"
-            with MemoryStore(path) as store:
-                memory_id, _ = store.add(record())
-                store.connection.execute("DROP TABLE memory_chunks")
-                store.connection.execute("UPDATE metadata SET value = '2' WHERE key = 'schema_version'")
-                store.connection.commit()
-            with MemoryStore(path) as store:
-                self.assertEqual(store.list()[0]["id"], memory_id)
-                self.assertGreater(store.connection.execute(
-                    "SELECT COUNT(*) FROM memory_chunks WHERE memory_id = ?", (memory_id,)
-                ).fetchone()[0], 0)
 
     def test_openai_compatible_embedding_without_tokenizer_fails_closed(self) -> None:
         provider = OpenAICompatibleEmbeddingProvider(
             base_url="http://localhost/v1", api_key="fake", model="test",
         )
         with tempfile.TemporaryDirectory() as temp_dir:
-            with MemoryStore(Path(temp_dir) / "memory.sqlite3", provider) as store:
+            with MemoryStore(Path(temp_dir) / "memory-workspace", provider) as store:
                 with self.assertRaisesRegex(RuntimeError, "tokenizer"):
                     store.add(record())
 

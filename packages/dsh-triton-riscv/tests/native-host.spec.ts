@@ -66,7 +66,6 @@ async function setup(
     ...process.env,
     TRITON_RISCV_REPO_ROOT: root,
     TRITON_RISCV_STATE_DIR: join(root, 'state'),
-    TRITON_RISCV_MEMORY_DB: join(root, 'state/memory.sqlite3'),
     TRITON_RISCV_MCP_PYTHON: python,
     TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY: '1',
     TRITON_RISCV_ALLOW_VALIDATION: allowValidation ? '1' : '0',
@@ -93,7 +92,6 @@ async function setup(
   if (options.noRepoRoot) {
     delete input.repoRoot
     delete input.stateDir
-    delete input.memory.database
   }
   const nativeFiber = await ctx.plugin(Native, input)
   const handles = new Map()
@@ -140,7 +138,7 @@ async function setup(
         'import os',
         'from pathlib import Path',
         'from codex_agent.memory import MemoryRecord, MemoryStore',
-        'with MemoryStore(Path(os.environ["TRITON_RISCV_MEMORY_DB"])) as store:',
+        'with MemoryStore(Path(os.environ["TRITON_RISCV_REPO_ROOT"])) as store:',
         '    store.add(MemoryRecord(memory_type="failure-diagnosis", operator="square_new", semantics="Compute the elementwise square of the input tensor.", pytorch_reference="torch.square(x)", summary="Synthetic native integration evidence; not a real validation result.", outcome="failed", confidence_grade="C", source_run="synthetic:native-integration", evidence={"recommended_actions":["Check the mask on the last block."]}))',
       ].join('\n'),
     ],
@@ -213,7 +211,7 @@ it('real host guard denies generic bypass after activation, survives restore and
 
 it('real host + real stdio MCP: prepares, approves and applies in an isolated checkout', async () => {
   const h = await setup('allowed-once')
-  expect(h.ctx.tools.schemas(h.agent).filter(t => t.name.startsWith('mcp__triton_riscv__'))).toHaveLength(20)
+  expect(h.ctx.tools.schemas(h.agent).filter(t => t.name.startsWith('mcp__triton_riscv__'))).toHaveLength(21)
   const prepare = await h.call('prepare_operator_development', {
     specification: h.fixture.spec,
   })
@@ -460,7 +458,7 @@ it('starts without repoRoot, initializes once before first prompt, and exposes n
   const h = await setup('rejected', false, { noRepoRoot: true, initialize: false })
   expect(h.ctx.tools.schemas(h.agent)).toHaveLength(0)
   const first = await h.ctx.systemPrompt.assemble(assembleContextFor(h.agent))
-  expect(first.tools.filter(t => t.name.startsWith('mcp__triton_riscv__'))).toHaveLength(20)
+  expect(first.tools.filter(t => t.name.startsWith('mcp__triton_riscv__'))).toHaveLength(21)
   expect(h.ctx.tools.schemas()).toHaveLength(0)
   const again = await h.ctx.systemPrompt.assemble(assembleContextFor(h.agent))
   expect(again.tools).toEqual(first.tools)
@@ -498,7 +496,7 @@ it('two real workspace clients keep same-named sources, approvals and RAG eviden
   expect(contextA).toContain('synthetic:native-integration')
   expect(contextB).not.toContain('synthetic:native-integration')
   expect(contextB).not.toContain(idA)
-  expect(resolveSessionConfig(h.input, b.session).memory.database).not.toBe(h.env.TRITON_RISCV_MEMORY_DB)
+  expect(resolveSessionConfig(h.input, b.session).repoRoot).not.toBe(h.env.TRITON_RISCV_REPO_ROOT)
   const foreign = await h.call('apply_development_proposal', { proposal_id: idA }, b)
   expect(foreign.isError).toBe(true)
   expect(h.questions).toHaveLength(0)
@@ -580,7 +578,7 @@ it('does not let a nested agent borrow its parent workspace connection or contex
   })
   expect(before.isError).toBe(true)
   const assembly = await h.ctx.systemPrompt.assemble(assembleContextFor(child))
-  expect(assembly.tools.filter(t => t.name.startsWith('mcp__triton_riscv__'))).toHaveLength(20)
+  expect(assembly.tools.filter(t => t.name.startsWith('mcp__triton_riscv__'))).toHaveLength(21)
   expect(renderContextSnapshot(assembly)).not.toContain('synthetic:native-integration')
   expect(data(await h.call('discover_operator', { operator_name: 'square_new' }, child)).status).toBe('not_found')
 }, 60_000)

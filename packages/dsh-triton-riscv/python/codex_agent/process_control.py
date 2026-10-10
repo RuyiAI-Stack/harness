@@ -19,11 +19,17 @@ class ExecutionCancelled(RuntimeError):
 def validation_environment() -> dict[str, str]:
     """Do not hand model credentials or plugin approval switches to test code."""
     from codex_agent.runtime_config import CONFIG_ENV, runtime_config
-    credential = runtime_config().memory.embedding.apiKeyEnv
+    settings = runtime_config()
+    credential = settings.memory.embedding.apiKeyEnv
+    database_credential = settings.storage.urlEnv
+    cache_credential = settings.cache.urlEnv
+    queue_credential = settings.queue.urlEnv
     return {key: value for key, value in os.environ.items()
             if not key.startswith("TRITON_RISCV_ALLOW_")
             and not key.endswith(("API_KEY", "ACCESS_TOKEN", "AUTH_TOKEN", "PASSWORD"))
-            and key not in {CONFIG_ENV, credential, "SSH_AUTH_SOCK", "GH_TOKEN", "GITHUB_TOKEN"}}
+            and key not in {CONFIG_ENV, credential, database_credential, cache_credential, queue_credential,
+                           "TRITON_AMQP_URL",
+                           "TRITON_REDIS_URL", "TRITON_MYSQL_URL", "SSH_AUTH_SOCK", "GH_TOKEN", "GITHUB_TOKEN"}}
 
 
 @contextmanager

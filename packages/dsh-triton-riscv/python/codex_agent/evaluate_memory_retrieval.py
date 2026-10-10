@@ -25,7 +25,7 @@ def load_fixture(path: Path) -> dict[str, Any]:
 
 def evaluate_fixture(payload: dict[str, Any]) -> dict[str, Any]:
     with tempfile.TemporaryDirectory() as temporary:
-        with MemoryStore(Path(temporary) / "memory.sqlite3") as store:
+        with MemoryStore(Path(temporary)) as store:
             source_to_id: dict[str, int] = {}
             for item in payload["corpus"]:
                 memory_id, _ = store.add(MemoryRecord(**item))

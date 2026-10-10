@@ -29,11 +29,11 @@ class RuntimeConfigTests(unittest.TestCase):
         self.assertFalse(cfg.remote.requireTaskQuotas)
 
     def test_native_settings_are_authoritative_for_all_consumers(self):
-        from codex_agent.diagnostic_memory import memory_database_path
+        from codex_agent.diagnostic_memory import memory_workspace
         from codex_agent.paths import repository_root, state_root
         from codex_agent.remote_executor import RemoteValidationConfig
         raw = document(permissions={"validation": True},
-                       memory={"database": "/tmp/history.sqlite3"})
+                       storage={"urlEnv": "WORKSPACE_DB_URL"})
         env = {CONFIG_ENV: raw, "TRITON_RISCV_REPO_ROOT": "/wrong",
                "TRITON_RISCV_STATE_DIR": "/wrong-state", "TRITON_RISCV_MEMORY_DB": "/wrong-db",
                "TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY": "1", "TRITON_RISCV_ALLOW_REPAIR_APPLY": "1",
@@ -42,7 +42,8 @@ class RuntimeConfigTests(unittest.TestCase):
         with patch.dict(os.environ, env, clear=True):
             self.assertEqual(repository_root(), Path("/tmp/operator repo").resolve())
             self.assertEqual(state_root(Path("/unused")), Path("/tmp/operator-state").resolve())
-            self.assertEqual(memory_database_path(Path("/unused")), Path("/tmp/history.sqlite3"))
+            self.assertEqual(memory_workspace(repository_root()), repository_root())
+            self.assertEqual(runtime_config().storage.urlEnv, "WORKSPACE_DB_URL")
             self.assertIsNone(RemoteValidationConfig.from_env())
             self.assertTrue(permission_enabled("validation"))
             self.assertTrue(permission_enabled("job"))
@@ -113,7 +114,7 @@ class RuntimeConfigTests(unittest.TestCase):
         cfg = runtime_config(env)
         self.assertEqual(cfg.repoRoot, "/tmp/old")
         self.assertTrue(cfg.permissions.repair)
-        self.assertEqual(cfg.memory.database, "history.sqlite3")
+        self.assertEqual(cfg.storage.urlEnv, "TRITON_MYSQL_URL")
         self.assertEqual(cfg.memory.embedding.tokenBudget, 256)
         self.assertEqual(cfg.remote.host, "old")
         with patch.dict(os.environ, env, clear=True):

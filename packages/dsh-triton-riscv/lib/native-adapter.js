@@ -187,6 +187,7 @@ export function installNativeAdapter(ctx, { bridge = callBridge, store = createS
       if (name === 'get_operator_implementation_proposal') own(state, args.proposal_id, 'development')
       if (name === 'retrieve_operator_memory' && args.run_id) own(state, args.run_id, 'run')
       if (name === 'get_validation_job') own(state, args.job_id, 'job')
+      if (name === 'inspect_queued_task') own(state, args.job_id, 'async-job')
       if (name === 'get_validation_status') own(state, args.run_id, 'plan')
       const kind = APPLY[name] || (name === 'validate_operator' && args.execute === true ? 'validation' : null)
       if (kind) {
@@ -272,8 +273,29 @@ export function installNativeAdapter(ctx, { bridge = callBridge, store = createS
         exec.signal.addEventListener('abort', cancelListener, { once: true })
       }
       const result = await next()
-      const data = decode(result)
+      let data = decode(result)
       if (!data || typeof data !== 'object') return result
+      if (
+        ['validate_operator', 'execute_approved_validation'].includes(name) &&
+        (data.async_job || data.status === 'queued') &&
+        data.job_id
+      ) {
+        state.artifacts[data.job_id] = 'async-job'
+        state.task.async_job_id = data.job_id
+        state.task.validation_status = data.queue_status || data.status
+        store.save(state)
+        return result
+      }
+      const inspectedValidation =
+        name === 'inspect_queued_task' &&
+        state.task.async_job_id === args.job_id &&
+        data.kind === 'validation' &&
+        ['succeeded', 'failed'].includes(data.status) &&
+        data.result?.receipt_path
+      if (name === 'inspect_queued_task') {
+        if (!inspectedValidation) return result
+        data = data.result
+      }
       if (name === 'get_operator_implementation_proposal') return result
       if (name === 'get_validation_status') return result
       if (name === 'get_validation_job' && state.active.job !== data.job_id) return result
@@ -321,7 +343,7 @@ export function installNativeAdapter(ctx, { bridge = callBridge, store = createS
           run_id: item.run_id,
         }))
       }
-      if (['validate_operator', 'execute_approved_validation'].includes(name) && data.run_id) {
+      if ((['validate_operator', 'execute_approved_validation'].includes(name) || inspectedValidation) && data.run_id) {
         state.artifacts[data.run_id] = data.status === 'planned' ? 'plan' : 'run'
         if (data.status !== 'planned')
           state.artifact_requests[data.run_id] =
@@ -344,7 +366,7 @@ export function installNativeAdapter(ctx, { bridge = callBridge, store = createS
         state.active = { request: args.development_id, development: data.proposal_id }
       if (name === 'propose_repair' && data.proposal_id) state.active = { run: args.run_id, repair: data.proposal_id }
       if (name === 'prepare_validation_job' && data.job_id) state.active = { job: data.job_id }
-      if (['validate_operator', 'execute_approved_validation'].includes(name) && data.run_id) {
+      if ((['validate_operator', 'execute_approved_validation'].includes(name) || inspectedValidation) && data.run_id) {
         if (data.status === 'planned') state.active = { plan: data.run_id }
         else state.active.run = data.run_id
       }
@@ -356,7 +378,7 @@ export function installNativeAdapter(ctx, { bridge = callBridge, store = createS
         delete state.active.plan
         for (const key of ['run_id', 'receipt_path', 'log_path', 'exit_code', 'failure_stage']) delete state.task[key]
         state.task.validation_status = 'not_validated_after_change'
-      } else if (['validate_operator', 'execute_approved_validation'].includes(name)) {
+      } else if (['validate_operator', 'execute_approved_validation'].includes(name) || inspectedValidation) {
         state.task.validation_status = data.status
       }
 

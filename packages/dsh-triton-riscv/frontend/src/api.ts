@@ -46,10 +46,10 @@ export const api = {
     }
   },
   getSessionApprovals: (sessionId: string) => request<RunEvent[]>(`/api/sessions/${sessionId}/approvals`),
-  sendMessage: (sessionId: string, content: string) =>
+  sendMessage: (sessionId: string, content: string, requestId: string = crypto.randomUUID()) =>
     request<MessageResult>(`/api/sessions/${sessionId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, request_id: requestId }),
     }),
   getRun: (runId: string) => request<Run>(`/api/runs/${runId}`),
   getEvents: (runId: string) => request<RunEvent[]>(`/api/runs/${runId}/events`),

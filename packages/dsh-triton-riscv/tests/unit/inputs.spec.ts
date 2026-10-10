@@ -11,6 +11,15 @@ import { apply } from '../../native.js'
 import { apply as policy } from '../../index.js'
 
 describe('inputs: configuration and activation boundaries', () => {
+  it('keeps queue optional, typed and credentials outside settings', () => {
+    expect(resolveConfig().queue.enabled).toBe(false)
+    for (const queue of [{ enabled: 'yes' }, { leaseSeconds: 0 }, { urlEnv: 'TRITON_MYSQL_URL' }, { unknown: true }])
+      expect(() => resolveConfig({ queue })).toThrow()
+    const config = resolveConfig({ repoRoot: '/tmp/op', queue: { enabled: true, urlEnv: 'MQ_SECRET' } })
+    const env = workerEnvironment(config, { MQ_SECRET: 'amqp://temporary' })
+    expect(env.MQ_SECRET).toBe('amqp://temporary')
+    expect(env[CONFIG_ENV]).not.toContain('amqp://temporary')
+  })
   it('is inert until explicitly configured, without requiring Python or a checkout', async () => {
     const ctx = { plugin: vi.fn(), on: vi.fn(), effect: vi.fn() }
     await apply(ctx, {})
@@ -30,6 +39,12 @@ describe('inputs: configuration and activation boundaries', () => {
       { remote: { host: 'h;sh', repository: '/repo' } },
       { remote: { host: 'host', repository: '/repo/../other' } },
       { memory: { embedding: { tokenBudget: -1 } } },
+      { memory: { database: '/old.sqlite3' } },
+      { storage: { poolSize: 0 } },
+      { storage: { maxOverflow: -1 } },
+      { storage: { poolTimeout: 61 } },
+      { storage: { urlEnv: 'PATH' } },
+      { storage: { url: 'mysql+pymysql://user:secret@localhost/db' } },
       { memory: { embedding: { apiKeyEnv: 'TRITON_RISCV_ALLOW_VALIDATION' } } },
     ])
       expect(() => resolveConfig(value)).toThrow()
@@ -42,6 +57,24 @@ describe('inputs: configuration and activation boundaries', () => {
     expect(result.memory.contextFormat).toBe('classic')
     expect(result.memory.embedding.provider).toBe('none')
     expect(result).not.toHaveProperty('env')
+    expect(result.cache.enabled).toBe(false)
+  })
+  it('validates Redis options and shares them without exposing credentials', () => {
+    for (const cache of [
+      { enabled: 'true' },
+      { urlEnv: 'PATH' },
+      { lockMs: 0 },
+      { unknown: 1 },
+      { urlEnv: 'TRITON_MYSQL_URL' },
+      { bloomErrorRate: 0 },
+      { maxConcurrent: 0 },
+    ])
+      expect(() => resolveConfig({ cache })).toThrow()
+    const config = resolveConfig({ repoRoot: '/tmp/op', cache: { enabled: true, urlEnv: 'CACHE_SECRET' } })
+    const env = workerEnvironment(config, { CACHE_SECRET: 'redis://:secret@localhost:6379/0' })
+    expect(env.CACHE_SECRET).toContain('secret')
+    expect(env[CONFIG_ENV]).not.toContain('redis://')
+    expect(JSON.parse(env[CONFIG_ENV]).cache.enabled).toBe(true)
   })
   it('uses the same explicit target and permissions for MCP and approval bridge', () => {
     const config = resolveConfig({
@@ -80,6 +113,24 @@ describe('inputs: configuration and activation boundaries', () => {
     })
     expect(JSON.stringify(config)).not.toContain('secret-value')
     expect(mcpConfiguration(config, { EMBEDDING_TEST_KEY: 'secret-value' }).env.EMBEDDING_TEST_KEY).toBe('secret-value')
+  })
+  it('shares bounded MySQL settings but keeps the URL out of the configuration document', () => {
+    const config = resolveConfig({
+      repoRoot: '/tmp/op',
+      storage: { urlEnv: 'WORKSPACE_DB_URL', poolSize: 2, maxOverflow: 0 },
+    })
+    const ambient = { WORKSPACE_DB_URL: 'mysql+pymysql://user:secret@localhost/db' }
+    const mcp = mcpConfiguration(config, ambient)
+    const bridge = bridgeEnvironment(config, ambient)
+    expect(mcp.env.WORKSPACE_DB_URL).toBe(ambient.WORKSPACE_DB_URL)
+    expect(bridge.WORKSPACE_DB_URL).toBe(ambient.WORKSPACE_DB_URL)
+    expect(mcp.env[CONFIG_ENV]).not.toContain('secret')
+    expect(JSON.parse(mcp.env[CONFIG_ENV]).storage).toEqual({
+      urlEnv: 'WORKSPACE_DB_URL',
+      poolSize: 2,
+      maxOverflow: 0,
+      poolTimeout: 10,
+    })
   })
   it('passes the strict resource requirement to both execution paths, never from ambient settings', () => {
     const config = resolveConfig({

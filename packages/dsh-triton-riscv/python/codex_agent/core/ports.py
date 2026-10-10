@@ -50,7 +50,7 @@ class ModelGateway(Protocol):
 
 
 class MemoryPort(Protocol):
-    """Port implemented by SQLite memory and future remote/vector stores."""
+    """Port implemented by the workspace-scoped MySQL memory store."""
 
     def retrieve(self, query: Any, limit: int = 5) -> list[dict]:
         """Retrieve evidence records for one context."""

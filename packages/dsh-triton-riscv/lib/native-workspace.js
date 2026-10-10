@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { realpathSync, statSync } from 'node:fs'
-import { basename, dirname, isAbsolute, join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import { mcpConfiguration, resolveConfig } from './config.js'
 import { installNativeAdapter } from './native-adapter.js'
 import { callBridge } from './native-bridge.js'
@@ -33,12 +33,7 @@ export function resolveSessionConfig(input, session) {
       ? base.stateDir
       : join(base.stateDir, 'workspaces', id)
     : join(root, 'agent-results')
-  const database = input.memory?.database
-    ? legacy
-      ? base.memory.database
-      : join(dirname(base.memory.database), 'workspaces', id, basename(base.memory.database))
-    : join(stateDir, 'memory.sqlite3')
-  return resolveConfig({ ...input, repoRoot: root, stateDir, memory: { ...input.memory, database } })
+  return resolveConfig({ ...input, repoRoot: root, stateDir })
 }
 
 export function installWorkspaceHost(ctx, input, { mcp, createScope }) {

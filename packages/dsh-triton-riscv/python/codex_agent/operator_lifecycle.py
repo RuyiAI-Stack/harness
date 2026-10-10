@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 
 from codex_agent.operator_tools import discover_operator_evidence
 from codex_agent.diagnostic_memory import remember_validation
+from codex_agent.tasks.context import defer_memory
 from codex_agent.memory_api import MemoryRetrievalToolResult, RetrievedMemoryCase, retrieve_operator_memory
 from codex_agent.remote_executor import (
     RemotePreflightResult,
@@ -398,7 +399,8 @@ def validate_operator_target(
     )
     # Only executed, audited outcomes become historical evidence.
     payload["memory_write"] = (
-        remember_validation(root, payload, operator)
+        ({"status": "deferred", "reason": "validation worker will enqueue audited evidence"}
+         if defer_memory.get() else remember_validation(root, payload, operator))
         if execute and result.failure_stage not in {"capacity", "cancellation"} and validation_evidence.verdict in {"verified-passed", "verified-failed"}
         else {"status": "not-recorded", "reason": "no verified execution"}
     )

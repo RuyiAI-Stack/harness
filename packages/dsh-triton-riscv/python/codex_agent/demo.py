@@ -134,7 +134,7 @@ def memory_demo(memory_path: Path, development_dir: Path) -> dict:
         )
         stats = store.stats()
     return {
-        "database": memory_path.as_posix(),
+        "database": "mysql", "workspace": memory_path.as_posix(),
         "ingestion": ingestion,
         "stats": stats,
         "query": {
@@ -321,7 +321,7 @@ def main() -> int:
             repo_root / "agent-results" / "development"
         ),
         "memory": memory_demo(
-            repo_root / "agent-results" / "memory.sqlite3",
+            repo_root,
             repo_root / "agent-results" / "development",
         ),
         "project_discovery": project_demo(

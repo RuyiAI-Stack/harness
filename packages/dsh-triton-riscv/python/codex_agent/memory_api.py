@@ -43,6 +43,7 @@ class RetrievedMemoryCase(BaseModel):
 class MemoryRetrievalToolResult(BaseModel):
     status: Literal["found", "empty", "unavailable"]
     database: str
+    workspace: str | None = None
     query: dict[str, Any]
     items: list[RetrievedMemoryCase] = Field(default_factory=list)
     warning: str | None = None

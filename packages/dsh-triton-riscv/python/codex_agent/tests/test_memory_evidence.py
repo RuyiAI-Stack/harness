@@ -83,7 +83,7 @@ class EvidenceTests(unittest.TestCase):
             changed=json.loads(s[1].content); changed["diff"]="@@ -1 +1 @@\n-old\n+newer"
             updated=record_from_validation_receipt(r,sources=[s[0],EvidenceSource(s[1].path,json.dumps(changed))])
             self.assertEqual(store.add(updated),(mid,False))
-            chunks=[dict(c) for c in store.connection.execute("SELECT * FROM memory_chunks")]
+            chunks=store.chunk_rows()
             self.assertFalse(any("+new\n" in c["text"] for c in chunks))
             r2={**r,"run_id":"run-b"}
             store.add(record_from_validation_receipt(r2,sources=[EvidenceSource("b.json",json.dumps(r2))]))
@@ -109,10 +109,10 @@ class EvidenceTests(unittest.TestCase):
         from codex_agent.operator_lifecycle import MemoryRetrievalToolResult
         r,s=fixture()
         with tempfile.TemporaryDirectory() as temp:
-            db=Path(temp)/"m.db"
-            with MemoryStore(db) as store:
+            root = Path(temp)
+            with MemoryStore(root) as store:
                 store.add(record_from_validation_receipt(r,sources=s))
-            with patch.dict("os.environ", {"TRITON_RISCV_MEMORY_DB":str(db),"TRITON_RISCV_EMBEDDING_PROVIDER":"none","TRITON_RISCV_MEMORY_RETRIEVAL_MODE":"legacy"}):
+            with patch.dict("os.environ", {"TRITON_RISCV_EMBEDDING_PROVIDER":"none","TRITON_RISCV_MEMORY_RETRIEVAL_MODE":"legacy"}):
                 result=retrieve_memories(Path(temp),operator_name="demo",failure_stage="mlir-translate")
             typed=MemoryRetrievalToolResult.model_validate(result).model_dump()
             self.assertTrue(typed["items"][0]["evidence_chain"]["items"])
@@ -126,7 +126,7 @@ class EvidenceTests(unittest.TestCase):
             self.assertEqual(len(sources),1)
             chain=assemble_receipt_evidence(r,sources+[EvidenceSource("broken.json","not json")])
             self.assertTrue(any(g["reason"]=="referenced-log-unavailable" for g in chain["gaps"]))
-            with patch.dict("os.environ", {"TRITON_RISCV_MEMORY_DB":str(Path(temp)/"m.db"),"TRITON_RISCV_EMBEDDING_PROVIDER":"none"}):
+            with patch.dict("os.environ", {"TRITON_RISCV_EMBEDDING_PROVIDER":"none"}):
                 self.assertEqual(remember_validation(Path(temp),r)["status"],"recorded")
 
     def test_public_second_cut_marks_patch_and_bad_confidence_degrades(self):

@@ -58,7 +58,7 @@ class DemoTests(unittest.TestCase):
             "memory": {
                 "stats": {"active": 0},
                 "results": [],
-                "database": "memory.sqlite3",
+                "database": "mysql",
             },
             "project_discovery": {
                 "total_targets": 0,

@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import Response
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -28,6 +29,9 @@ from codex_agent.operator_lifecycle import (
 from codex_agent.platform.executor import HarnessRunExecutor
 from codex_agent.platform.service import PlatformService
 from codex_agent.platform.store import PlatformStore
+from codex_agent.runtime_config import runtime_config
+from codex_agent.tasks.service import TaskService
+from codex_agent.tasks.store import Conflict
 
 
 class SessionRequest(BaseModel):
@@ -40,6 +44,13 @@ class SessionUpdateRequest(BaseModel):
 
 class MessageRequest(BaseModel):
     content: str = Field(min_length=1, max_length=12000)
+    request_id: str | None = Field(default=None, min_length=1, max_length=160)
+
+
+class ValidationJobRequest(BaseModel):
+    operator: str = Field(min_length=1, max_length=255)
+    approved_run_id: str = Field(min_length=1, max_length=120)
+    request_id: str = Field(min_length=1, max_length=160)
 
 
 class RepairDecisionRequest(BaseModel):
@@ -55,11 +66,13 @@ def create_app(
     root = (repo_root or repository_root()).resolve()
     frontend_dist = Path(__file__).parents[1] / "frontend" / "dist"
     react_frontend_available = (frontend_dist / "index.html").is_file()
-    store = PlatformStore(state_root(root) / "platform.sqlite3")
+    store = PlatformStore(root)
     settings = harness_agent.settings if harness_agent else HarnessSettings.from_env(root)
     agent = harness_agent or HarnessAgent(settings)
     service = PlatformService(root, store, agent)
-    executor = HarnessRunExecutor(root, store, agent)
+    queued = runtime_config().queue.enabled
+    tasks = TaskService(root) if queued else None
+    executor = HarnessRunExecutor(root, store, agent, workers=0 if queued else 2)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -76,6 +89,7 @@ def create_app(
     app.state.store = store
     app.state.service = service
     app.state.executor = executor
+    app.state.tasks = tasks
     if react_frontend_available:
         app.mount(
             "/ui-assets",
@@ -100,6 +114,7 @@ def create_app(
         return {
             "status": "ok",
             "repo_root": root.as_posix(),
+            "execution_mode": "rabbitmq" if queued else "inline",
             "harness": {
                 "provider": settings.provider,
                 "model": settings.model,
@@ -153,11 +168,19 @@ def create_app(
             raise HTTPException(status_code=404, detail=str(error)) from error
 
     @app.post("/api/sessions/{session_id}/messages")
-    def message(session_id: str, request: MessageRequest) -> dict:
+    def message(session_id: str, request: MessageRequest, response: Response) -> dict:
         try:
+            if tasks is not None:
+                if not request.request_id:
+                    raise HTTPException(status_code=400, detail="request_id is required in queue mode; reuse it when retrying")
+                result = tasks.submit_turn(service, session_id, request.content, request.request_id)
+                response.status_code = 202
+                return result
             result = service.handle_message(session_id, request.content)
             result["run"] = executor.schedule(result["run"]["id"])
             return result
+        except Conflict as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
         except KeyError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except ValueError as error:
@@ -173,11 +196,53 @@ def create_app(
     @app.post("/api/runs/{run_id}/confirm")
     def confirm(run_id: str) -> dict:
         try:
+            if queued:
+                return store.get_run(run_id)
             return executor.confirm(run_id)
         except KeyError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
+
+    def task_service():
+        if tasks is None:
+            raise HTTPException(status_code=409, detail="queue execution is disabled")
+        return tasks
+
+    @app.post("/api/jobs/validation", status_code=202)
+    def submit_validation_job(request: ValidationJobRequest):
+        try:
+            return task_service().submit_validation(request.operator, request.approved_run_id, request.request_id)
+        except PermissionError as error:
+            raise HTTPException(status_code=403, detail=str(error)) from error
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail=str(error)) from error
+        except ValueError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
+
+    @app.get("/api/jobs/{job_id}")
+    def job(job_id: str):
+        try:
+            return task_service().jobs.detail(job_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="unknown job") from error
+
+    @app.post("/api/jobs/{job_id}/cancel")
+    def cancel_job(job_id: str):
+        try:
+            return task_service().jobs.cancel(job_id)
+        except KeyError as error:
+            raise HTTPException(status_code=404, detail="unknown job") from error
+
+    @app.get("/api/jobs/{job_id}/artifacts/{artifact_id}")
+    def job_artifact(job_id: str, artifact_id: str):
+        from codex_agent.artifacts import ArtifactStore
+        detail = job(job_id)
+        record = next((a for a in detail["artifacts"] if a["id"] == artifact_id), None)
+        if record is None:
+            raise HTTPException(status_code=404, detail="unknown artifact")
+        return Response(ArtifactStore(root).read(record), media_type="application/octet-stream",
+                        headers={"Content-Disposition": 'attachment; filename="' + record["name"] + '"'})
 
     @app.get("/api/runs/{run_id}/events")
     def events(run_id: str, after: int = Query(default=-1, ge=-1)) -> list[dict]:

@@ -189,13 +189,23 @@ async function plan(h, s, id = 'run-1') {
 }
 
 test('status queries require an owned plan and never reactivate an old plan or request approval', async () => {
-  const h = harness(), s = session('status-owner')
+  const h = harness(),
+    s = session('status-owner')
   await plan(h, s, 'old-plan')
   await plan(h, s, 'new-plan')
   const before = structuredClone(h.store.load(s.id))
-  await h.call(s, 'get_validation_status', { run_id: 'old-plan', remote: true }, {
-    run_id: 'old-plan', operator: 'other', execution_state: 'unknown', remote_state: 'queued', test_status: null,
-  })
+  await h.call(
+    s,
+    'get_validation_status',
+    { run_id: 'old-plan', remote: true },
+    {
+      run_id: 'old-plan',
+      operator: 'other',
+      execution_state: 'unknown',
+      remote_state: 'queued',
+      test_status: null,
+    },
+  )
   assert.deepEqual(h.store.load(s.id), before)
   assert.equal(h.questions.length, 0)
   const calls = h.calls()
@@ -466,6 +476,33 @@ test('a real but superseded plan ID in the same session cannot execute', async (
   assert.equal(h.questions.length, 0)
   await h.call(s, 'execute_approved_validation', { run_id: 'run-42' }, { status: 'passed' })
   assert.equal(h.questions.length, 1)
+})
+
+test('queued validation is not a receipt and only its owning session can collect it', async () => {
+  const h = harness(),
+    s = session('queued-owner')
+  await plan(h, s)
+  await h.call(
+    s,
+    'execute_approved_validation',
+    { run_id: 'run-1' },
+    { status: 'queued', job_id: 'async-1', run_id: 'run-1' },
+  )
+  assert.match(h.context(s), /queued/)
+  await assert.rejects(h.call(s, 'diagnose_failure', { run_id: 'run-1' }, {}), /not created|not the current/)
+  await assert.rejects(h.call(session('other'), 'inspect_queued_task', { job_id: 'async-1' }, {}), /not created/)
+  await h.call(
+    s,
+    'inspect_queued_task',
+    { job_id: 'async-1' },
+    {
+      kind: 'validation',
+      status: 'succeeded',
+      result: { status: 'passed', run_id: 'receipt-1', receipt_path: 'receipt.json' },
+    },
+  )
+  assert.match(h.context(s), /receipt-1/)
+  assert.match(h.context(s), /passed/)
 })
 
 test('a committed replay uses business checks without another approval dialog', async () => {

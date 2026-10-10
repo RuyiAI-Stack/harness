@@ -78,7 +78,7 @@ def evaluate_modes(
     if limit < 1 or not 0.0 <= lexical_weight <= 1.0:
         raise ValueError("limit must be positive and lexical_weight must be between 0 and 1")
     with tempfile.TemporaryDirectory() as directory:
-        database = Path(directory) / "memory.sqlite3"
+        database = Path(directory)
         with MemoryStore(database) as store:
             sources = set()
             for item in payload["corpus"]:

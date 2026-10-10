@@ -44,6 +44,35 @@ jobs:
     name: vitest
     needs: pre-commit
     runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-password
+          MYSQL_ROOT_HOST: '%'
+          MYSQL_DATABASE: triton_agent_test
+        ports:
+          - 3306/tcp
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s --health-timeout=5s --health-retries=12
+      redis:
+        image: redis:8.2
+        ports:
+          - 6379/tcp
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s --health-timeout=5s --health-retries=6
+      rabbitmq:
+        image: rabbitmq:4.3.6
+        env:
+          RABBITMQ_DEFAULT_USER: ci
+          RABBITMQ_DEFAULT_PASS: ci-only-password
+        ports:
+          - 5672/tcp
+        options: >-
+          --health-cmd="rabbitmq-diagnostics -q ping"
+          --health-interval=10s --health-timeout=5s --health-retries=12
     steps:
       - name: Checkout harness
         uses: actions/checkout@v4
@@ -67,5 +96,32 @@ jobs:
       - name: Install and build repository
         run: ./tools/scripts/install-all.sh
 
+      - name: Configure disposable Redis
+        env:
+          TRITON_TEST_REDIS_URL: redis://127.0.0.1:${{ job.services.redis.ports['6379'] }}/0
+        run: |
+          packages/dsh-triton-riscv/.venv/bin/python -I - <<'PY'
+          import os
+          import redis
+
+          with redis.Redis.from_url(os.environ['TRITON_TEST_REDIS_URL'],
+                                    socket_timeout=5, socket_connect_timeout=5,
+                                    decode_responses=True) as client:
+              client.config_set('maxmemory', '64mb')
+              client.config_set('maxmemory-policy', 'noeviction')
+              settings = client.config_get('maxmemory*')
+              assert int(settings['maxmemory']) == 64 * 1024 * 1024, settings
+              assert settings['maxmemory-policy'] == 'noeviction', settings
+          PY
+
+      - name: Prepare disposable plugin database
+        env:
+          TRITON_MYSQL_URL: mysql+pymysql://root:ci-only-password@127.0.0.1:${{ job.services.mysql.ports['3306'] }}/triton_agent_test
+        run: packages/dsh-triton-riscv/.venv/bin/python -I -m codex_agent.storage upgrade
+
       - name: Run tests
-        run: pnpm test:all
+        env:
+          TRITON_MYSQL_URL: mysql+pymysql://root:ci-only-password@127.0.0.1:${{ job.services.mysql.ports['3306'] }}/triton_agent_test
+          TRITON_TEST_REDIS_URL: redis://127.0.0.1:${{ job.services.redis.ports['6379'] }}/0
+          TRITON_TEST_AMQP_URL: amqp://ci:ci-only-password@127.0.0.1:${{ job.services.rabbitmq.ports['5672'] }}/
+        run: pnpm test:all --reporter=verbose

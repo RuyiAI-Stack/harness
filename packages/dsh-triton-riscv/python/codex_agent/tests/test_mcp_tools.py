@@ -87,6 +87,7 @@ class McpOperatorToolTests(unittest.IsolatedAsyncioTestCase):
                 "execute_validation_job",
                 "get_validation_job",
                 "get_validation_status",
+                "inspect_queued_task",
                 "evaluate_plugin_fixtures",
             },
         )

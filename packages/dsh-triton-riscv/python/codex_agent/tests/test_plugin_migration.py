@@ -11,8 +11,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from mcp import Client
 
-import codex_agent
-from codex_agent.diagnostic_memory import memory_database_path, remember_validation
+from codex_agent.diagnostic_memory import memory_workspace, remember_validation
 from codex_agent.harness import HarnessAgent, HarnessSettings
 from codex_agent.harness.mcp_server import server
 from codex_agent.platform.api import create_app
@@ -26,15 +25,22 @@ class InstalledMigrationTests(unittest.TestCase):
     def test_installed_package_cannot_be_shadowed_by_target_checkout(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            command = [sys.executable, "-I", "-c", "import codex_agent; print(codex_agent.__file__)"]
+            # The test runner may import source; isolated children use the installed package.
+            baseline = subprocess.run(command, cwd=root, capture_output=True, text=True, timeout=20)
+            self.assertEqual(baseline.returncode, 0, baseline.stderr)
+            installed = Path(baseline.stdout.strip()).resolve()
+            self.assertTrue(installed.is_file())
             shadow = root / "codex_agent"
             shadow.mkdir()
             (shadow / "__init__.py").write_text("raise RuntimeError('old checkout imported')")
             completed = subprocess.run(
-                [sys.executable, "-I", "-c", "import codex_agent; print(codex_agent.__file__)"],
+                command, env={**os.environ, "PYTHONPATH": str(root)},
                 cwd=root, capture_output=True, text=True, timeout=20,
             )
             self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertEqual(Path(completed.stdout.strip()).resolve(), Path(codex_agent.__file__).resolve())
+            self.assertEqual(Path(completed.stdout.strip()).resolve(), installed)
+            self.assertNotEqual(installed, (shadow / "__init__.py").resolve())
 
     def test_ui_and_state_do_not_require_backend_inside_target_checkout(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -52,14 +58,14 @@ class InstalledMigrationTests(unittest.TestCase):
                     self.assertEqual(client.get("/api/health").json()["repo_root"], str(root.resolve()))
                     session = client.post("/api/sessions", json={"title": "migration"}).json()
                     self.assertEqual(client.delete(f"/api/sessions/{session['id']}").status_code, 204)
-            self.assertTrue((state / "platform.sqlite3").is_file())
+            self.assertFalse((state / "platform.sqlite3").exists())
             self.assertFalse((root / "codex_agent").exists())
             self.assertFalse((root / "agent-results/platform.sqlite3").exists())
 
     def test_managed_context_reaches_executor_and_persists(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            store = PlatformStore(root / "state.sqlite3")
+            store = PlatformStore(root)
             settings = HarnessSettings.from_env(root, {"TRITON_RISCV_CONTEXT_SUMMARY_MODE": "extractive"})
             executor = HarnessRunExecutor(root, store, HarnessAgent(settings, FakeHarnessBackend()))
             try:
@@ -80,7 +86,6 @@ class MemoryMcpMigrationTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             with patch.dict(os.environ, {"TRITON_RISCV_REPO_ROOT": str(root),
-                    "TRITON_RISCV_MEMORY_DB": str(root / "history.sqlite3"),
                     "TRITON_RISCV_EMBEDDING_PROVIDER": "none",
                     "TRITON_RISCV_MEMORY_RETRIEVAL_MODE": "legacy"}):
                 remember_validation(root, failed_receipt("previous"), OPERATOR)
@@ -96,4 +101,5 @@ class MemoryMcpMigrationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(item["recommended_actions"], ["Preserve the failing IR."])
                 self.assertIsNone(item["applied_action"])
                 self.assertEqual(item["source_run"], "operator-lifecycle:previous")
-                self.assertEqual(Path(payload["database"]), memory_database_path(root))
+                self.assertEqual(payload["database"], "mysql")
+                self.assertEqual(Path(payload["workspace"]), memory_workspace(root))
