@@ -96,6 +96,24 @@ jobs:
       - name: Install and build repository
         run: ./tools/scripts/install-all.sh
 
+      - name: Configure disposable Redis
+        env:
+          TRITON_TEST_REDIS_URL: redis://127.0.0.1:${{ job.services.redis.ports['6379'] }}/0
+        run: |
+          packages/dsh-triton-riscv/.venv/bin/python -I - <<'PY'
+          import os
+          import redis
+
+          with redis.Redis.from_url(os.environ['TRITON_TEST_REDIS_URL'],
+                                    socket_timeout=5, socket_connect_timeout=5,
+                                    decode_responses=True) as client:
+              client.config_set('maxmemory', '64mb')
+              client.config_set('maxmemory-policy', 'noeviction')
+              settings = client.config_get('maxmemory*')
+              assert int(settings['maxmemory']) == 64 * 1024 * 1024, settings
+              assert settings['maxmemory-policy'] == 'noeviction', settings
+          PY
+
       - name: Prepare disposable plugin database
         env:
           TRITON_MYSQL_URL: mysql+pymysql://root:ci-only-password@127.0.0.1:${{ job.services.mysql.ports['3306'] }}/triton_agent_test

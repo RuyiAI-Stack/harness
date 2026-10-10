@@ -11,7 +11,6 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from mcp import Client
 
-import codex_agent
 from codex_agent.diagnostic_memory import memory_workspace, remember_validation
 from codex_agent.harness import HarnessAgent, HarnessSettings
 from codex_agent.harness.mcp_server import server
@@ -26,15 +25,22 @@ class InstalledMigrationTests(unittest.TestCase):
     def test_installed_package_cannot_be_shadowed_by_target_checkout(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            command = [sys.executable, "-I", "-c", "import codex_agent; print(codex_agent.__file__)"]
+            # The test runner may import source; isolated children use the installed package.
+            baseline = subprocess.run(command, cwd=root, capture_output=True, text=True, timeout=20)
+            self.assertEqual(baseline.returncode, 0, baseline.stderr)
+            installed = Path(baseline.stdout.strip()).resolve()
+            self.assertTrue(installed.is_file())
             shadow = root / "codex_agent"
             shadow.mkdir()
             (shadow / "__init__.py").write_text("raise RuntimeError('old checkout imported')")
             completed = subprocess.run(
-                [sys.executable, "-I", "-c", "import codex_agent; print(codex_agent.__file__)"],
+                command, env={**os.environ, "PYTHONPATH": str(root)},
                 cwd=root, capture_output=True, text=True, timeout=20,
             )
             self.assertEqual(completed.returncode, 0, completed.stderr)
-            self.assertEqual(Path(completed.stdout.strip()).resolve(), Path(codex_agent.__file__).resolve())
+            self.assertEqual(Path(completed.stdout.strip()).resolve(), installed)
+            self.assertNotEqual(installed, (shadow / "__init__.py").resolve())
 
     def test_ui_and_state_do_not_require_backend_inside_target_checkout(self):
         with tempfile.TemporaryDirectory() as temporary:

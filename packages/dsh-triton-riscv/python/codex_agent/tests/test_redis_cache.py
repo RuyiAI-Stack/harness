@@ -25,6 +25,16 @@ from codex_agent.tests.test_memory import record
 @unittest.skipUnless(os.environ.get("TRITON_TEST_REDIS_URL") and os.environ.get("TRITON_MYSQL_URL"),
                      "disposable Redis and MySQL required")
 class RedisCacheTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        with redis.Redis.from_url(os.environ["TRITON_TEST_REDIS_URL"],
+                                  socket_timeout=2, socket_connect_timeout=2,
+                                  decode_responses=True) as client:
+            settings = client.config_get("maxmemory*")
+        if int(settings.get("maxmemory", 0)) <= 0 or settings.get("maxmemory-policy") != "noeviction":
+            raise RuntimeError("Disposable Redis requires maxmemory > 0 and maxmemory-policy noeviction; "
+                               "configure the test service before running cache tests")
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
