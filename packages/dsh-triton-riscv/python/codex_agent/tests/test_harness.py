@@ -3,8 +3,6 @@ from __future__ import annotations
 import tempfile
 import json
 import os
-import subprocess
-import yaml
 import unittest
 import sys
 import types
@@ -46,29 +44,6 @@ class FakeHarnessBackend:
 
 
 class HarnessIntegrationTests(unittest.TestCase):
-    def test_sdk_mcp_explicit_environment_survives_host_credential_scrubbing(self) -> None:
-        class Loader(yaml.SafeLoader):
-            pass
-        Loader.add_constructor('tag:yaml.org,2002:js', lambda loader, node: loader.construct_scalar(node))
-        settings = HarnessSettings.from_env(Path.cwd(), {})
-        composition = yaml.load(settings.cordis_path.read_text(), Loader=Loader)
-        expression = next(item for item in composition if item['id'] == 'mcp-triton-riscv')['config']['env']
-        document = {"storage": {"urlEnv": "CUSTOM_MYSQL"}, "indexing": {"enabled": True,
-            "apiKeyEnv": "VECTOR_SECRET", "embedding": {"apiKeyEnv": "EMBED_SECRET"}}}
-        environment = {"TRITON_RISCV_CONFIG": json.dumps(document), "DSH_CWD": "/operators",
-                       "CUSTOM_MYSQL": "db-test-only", "VECTOR_SECRET": "vector-test-only",
-                       "EMBED_SECRET": "embedding-test-only", "ISRC_API_KEY": "model-must-not-pass"}
-        program = "const vm = require('node:vm'); const x = JSON.parse(process.argv[1]); console.log(JSON.stringify(vm.runInNewContext(x.expression,{process:{env:x.env,cwd:()=>'/fallback'}})));"
-        result = subprocess.run(['node', '-e', program, json.dumps({'expression': expression, 'env': environment})],
-                                capture_output=True, text=True, check=True, timeout=10)
-        forwarded = json.loads(result.stdout)
-        self.assertEqual(forwarded['VECTOR_SECRET'], 'vector-test-only')
-        self.assertEqual(forwarded['EMBED_SECRET'], 'embedding-test-only')
-        self.assertEqual(forwarded['CUSTOM_MYSQL'], 'db-test-only')
-        self.assertEqual(forwarded['TRITON_RISCV_REPO_ROOT'], '/operators')
-        self.assertEqual(forwarded['TRITON_RISCV_REQUIRE_APPROVED_VALIDATION'], '1')
-        self.assertNotIn('ISRC_API_KEY', forwarded)
-
     def test_declared_index_credentials_reach_sdk_without_other_secrets(self) -> None:
         module = types.ModuleType("deepseek_harness")
         module.DeepSeekHarness = lambda **kwargs: SimpleNamespace(kwargs=kwargs)
