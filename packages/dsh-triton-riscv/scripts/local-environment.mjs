@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseEnv } from 'node:util'
+import { resolveConfig, workerEnvironment } from '../lib/config.js'
 
 const localKeys = new Set([
   'DSH_NATIVE_SOURCE', 'DSH_HOME', 'DSH_MODEL', 'DSH_PROVIDER', 'ISRC_BASE_URL',
@@ -26,6 +27,31 @@ export function loadLocalEnvironment(root, ambient = process.env) {
         throw new Error('Invalid local configuration key: ' + key)
       if (env[key] === undefined) env[key] = value
     }
+  }
+
+  const servicesPath = join(root, '.state/services.env')
+  if (existsSync(servicesPath)) {
+    const services = parseEnv(readFileSync(servicesPath, 'utf8'))
+    const allowed = new Set(['TRITON_MYSQL_URL', 'TRITON_REDIS_URL', 'TRITON_AMQP_URL', 'TRITON_QDRANT_API_KEY', 'AGENT_EMBEDDING_API_KEY'])
+    if (Object.keys(services).some(key => !allowed.has(key)))
+      throw new Error('Unsupported setting in .state/services.env')
+    for (const [key, value] of Object.entries(services)) if (env[key] === undefined) env[key] = value
+  }
+  const runtimePath = join(root, '.state/runtime.json')
+  if (existsSync(runtimePath) && env.TRITON_RISCV_CONFIG === undefined) {
+    let config
+    try {
+      const raw = readFileSync(runtimePath, 'utf8')
+      if (Buffer.byteLength(raw) > 65536) throw new Error('size')
+      const { schemaVersion, ...settings } = JSON.parse(raw)
+      if (schemaVersion !== 1) throw new Error('version')
+      config = resolveConfig(settings)
+    } catch {
+      throw new Error('Invalid .state/runtime.json; check schemaVersion and plugin configuration fields')
+    }
+    Object.assign(env, workerEnvironment(config, env))
+    env.TRITON_RISCV_REPO_ROOT = config.repoRoot
+    env.TRITON_RISCV_STATE_DIR = config.stateDir
   }
 
   const modelPath = join(root, '.state/model.env')

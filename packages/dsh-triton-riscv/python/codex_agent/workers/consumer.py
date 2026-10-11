@@ -42,10 +42,13 @@ async def execute_delivery(jobs, delivery, kind):
             await stop_child(process)
         current = await asyncio.to_thread(jobs.get, job['id'])
         if current['status'] == 'running':
-            status = 'needs-reconciliation' if current['effects_started'] else (
-                'cancelled' if current['cancel_requested'] else 'failed')
-            await asyncio.to_thread(jobs.finish, job['id'], job['owner'], status,
-                {'reason': 'child stopped without a durable result', 'exit_code': process.returncode})
+            result = {'reason': 'child stopped without a durable result', 'exit_code': process.returncode}
+            if job['kind'] == 'index':
+                await asyncio.to_thread(jobs.retry_index, job['id'], job['owner'], result)
+            else:
+                status = 'needs-reconciliation' if current['effects_started'] else (
+                    'cancelled' if current['cancel_requested'] else 'failed')
+                await asyncio.to_thread(jobs.finish, job['id'], job['owner'], status, result)
         await delivery.ack()
     except LeaseLost:
         if process is not None:

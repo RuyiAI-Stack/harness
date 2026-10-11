@@ -16,7 +16,10 @@ from sqlalchemy import func, select
 from codex_agent.storage.database import WorkspaceDatabase
 from codex_agent.storage.cache import ReadCache
 from codex_agent.runtime_config import runtime_config
-from codex_agent.storage.schema import memories as memory_table, chunks as chunk_table
+from codex_agent.storage.schema import (
+    memories as memory_table, chunks as chunk_table, memory_versions,
+)
+from .memory_lineage import case_identity, case_payload, chunk_lineage, digest, encode, policy_metadata
 
 from .embeddings import EmbeddingProvider, build_embedding_provider, cosine_similarity
 from .memory_selection import CandidateStrategy, select_candidates
@@ -24,6 +27,7 @@ from .memory_chunking import (
     ChunkPolicy,
     MemoryChunk,
     case_chunks,
+    case_chunk_parts,
     chunk_title,
     embedding_input,
     split_chunk_text,
@@ -47,7 +51,7 @@ MEMORY_TYPES = {
     "safety-event",
 }
 GRADE_CONFIDENCE = {"A": 1.0, "B": 0.8, "C": 0.55, "D": 0.2}
-RETRIEVAL_MODES = {"legacy", "jaccard", "embedding", "fusion"}
+RETRIEVAL_MODES = {"legacy", "jaccard", "embedding", "fusion", "qdrant"}
 FUSION_LEXICAL_WEIGHT = 0.6
 FUSION_RRF_K = 60
 MAX_CHUNK_CHARS = 600
@@ -218,7 +222,7 @@ class MemoryQuery:
         )
 
 
-def memory_fingerprint(record: MemoryRecord) -> str:
+def memory_fingerprint(record: MemoryRecord, *, bind_source: bool = True) -> str:
     chain = record.evidence.get("chain") or {}
     if chain.get("schema") == "evidence-chain-v1" and chain.get("identity"):
         # Upsert one source-bound episode; never overwrite a different run's provenance.
@@ -233,6 +237,10 @@ def memory_fingerprint(record: MemoryRecord) -> str:
         "outcome": record.outcome,
         "test": record.test_sha256,
     }
+    if bind_source:
+        payload["source_run"] = record.source_run
+        payload["attempt"] = record.evidence.get("attempt")
+        payload["iteration"] = record.evidence.get("iteration")
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True).encode("utf-8")
     ).hexdigest()
@@ -362,11 +370,14 @@ class MemoryStore:
         return ChunkPolicy(max_tokens=limit, overlap_tokens=min(24, limit // 6))
 
     def _case_chunks(self, item):
-        return memory_chunks(item,
+        return case_chunk_parts(item,
             token_count=self.embedding_provider.count_tokens if self.embedding_provider else None,
             policy=self._chunk_policy())
 
     def _insert_chunks(self, conn, memory_id, chunks, vectors=None):
+        row = self.db.rows(memory_table, memory_table.c.id == memory_id, connection=conn)[0]
+        item, version = self._snapshot_case(conn, row)
+        policy = policy_metadata(self._chunk_policy(), self.embedding_provider)
         for index, chunk in enumerate(chunks):
             vector = vectors[index] if vectors is not None else None
             self.db.insert(conn, chunk_table, dict(memory_id=memory_id, kind=chunk.kind,
@@ -374,14 +385,50 @@ class MemoryStore:
                 embedding_json=json.dumps(vector) if vector else None,
                 embedding_provider=self.embedding_provider.name if vector else None,
                 embedding_model=self.embedding_provider.model if vector else None,
-                embedding_dim=len(vector) if vector else None))
+                embedding_dim=len(vector) if vector else None,
+                **chunk_lineage(self.db.workspace_id, memory_id, version, item, chunk, policy)))
+
+    def _snapshot_case(self, conn, row):
+        item = self._row_dict(row)
+        payload = case_payload(item)
+        version = digest(payload)
+        if not self.db.rows(memory_versions, memory_versions.c.memory_id == row["id"],
+                            memory_versions.c.case_version == version, connection=conn):
+            self.db.insert(conn, memory_versions, dict(memory_id=row["id"], case_version=version,
+                           payload_json=encode(payload), captured_at=utc_timestamp()))
+        if row.get("case_version") != version:
+            self.db.update(conn, memory_table, {"case_version": version}, memory_table.c.id == row["id"])
+        return item, version
+
+    def case_snapshot(self, memory_id, version):
+        if (type(memory_id) is not int or memory_id <= 0 or not isinstance(version, str)
+                or not re.fullmatch(r"[0-9a-f]{64}", version)):
+            raise ValueError("expected positive memory_id and a SHA256 case version")
+        rows = self.db.rows(memory_versions, memory_versions.c.memory_id == memory_id,
+                            memory_versions.c.case_version == version)
+        return json.loads(rows[0]["payload_json"]) if rows else None
+
+    def _existing_record(self, conn, record, fingerprint):
+        legacy = memory_fingerprint(record, bind_source=False)
+        rows = self.db.rows(memory_table, memory_table.c.fingerprint.in_({fingerprint, legacy}),
+                            connection=conn, lock=True)
+        for row in sorted(rows, key=lambda r: r["fingerprint"] != fingerprint):
+            if row["fingerprint"] == fingerprint:
+                return [row]
+            old = self._row_dict(row)
+            if old["source_run"] == record.source_run and all(
+                old["evidence"].get(key) == record.evidence.get(key) for key in ("attempt", "iteration")
+            ):
+                return [row]
+        return []
 
     def rebuild_chunks(self):
         changed = 0
         with self.db.transaction() as conn:
             self.db.lock(conn, "memory-write")
             for row in self._stored(connection=conn):
-                chunks = self._case_chunks(self._row_dict(row))
+                item, version = self._snapshot_case(conn, row)
+                chunks = self._case_chunks(item)
                 existing = self.chunk_rows(row["id"], connection=conn)
                 before = [(c["kind"], c["position"], c["text"], c["source_field"]) for c in existing]
                 after = sorted((c.kind, c.position, c.text, c.source_field) for c in chunks)
@@ -389,7 +436,28 @@ class MemoryStore:
                     self.db.delete(conn, chunk_table, chunk_table.c.memory_id == row["id"])
                     self._insert_chunks(conn, row["id"], chunks)
                     changed += 1
+                else:
+                    # Metadata-only backfill must preserve byte-identical chunk vectors.
+                    indexed = {(c.kind, c.position): c for c in chunks}
+                    policy = policy_metadata(self._chunk_policy(), self.embedding_provider)
+                    updated = False
+                    for old in existing:
+                        part = indexed[(old["kind"], old["position"])]
+                        lineage = chunk_lineage(self.db.workspace_id, row["id"], version, item, part, policy)
+                        if any(old.get(key) != value for key, value in lineage.items()):
+                            self.db.update(conn, chunk_table, lineage, chunk_table.c.memory_id == row["id"],
+                                           chunk_table.c.kind == old["kind"], chunk_table.c.position == old["position"])
+                            updated = True
+                    changed += int(updated)
+                self._queue_index(conn, row["id"])
         return changed
+
+    def _queue_index(self, conn, memory_id):
+        if runtime_config().indexing.enabled:
+            from .indexing.store import schedule
+            row = self.db.rows(memory_table, memory_table.c.id == memory_id, connection=conn)[0]
+            self._snapshot_case(conn, row)
+            schedule(self.db, conn, memory_id)
 
     def add(self, record):
         record = record.normalized()
@@ -401,18 +469,18 @@ class MemoryStore:
             old = self._row_dict(row)
             return all(old[key] == getattr(record, key) for key in (
                 "semantics", "pytorch_reference", "summary", "outcome", "evidence",
-                "environment", "source_run", "tl_ops",
+                "environment", "source_run", "tl_ops", "failure_stage", "error_signature", "test_sha256",
             ))
 
         if self.embedding_provider:
             # Check duplicates before spending any embedding calls; no model call holds a lock.
             with self.db.transaction() as conn:
                 self.db.lock(conn, "memory-write")
-                existing = self.db.rows(memory_table, memory_table.c.fingerprint == fingerprint,
-                                        connection=conn, lock=True)
+                existing = self._existing_record(conn, record, fingerprint)
                 if existing and unchanged(existing[0]):
                     memory_id = existing[0]["id"]
                     self.db.update(conn, memory_table, refresh, memory_table.c.id == memory_id)
+                    self._queue_index(conn, memory_id)
                     return memory_id, False
         searchable = record.searchable_text()
         chunks = self._case_chunks(asdict(record))
@@ -438,18 +506,20 @@ class MemoryStore:
         # Compute embeddings before locking. Parent/chunks become visible atomically.
         with self.db.transaction() as conn:
             self.db.lock(conn, "memory-write")
-            existing = self.db.rows(memory_table, memory_table.c.fingerprint == values["fingerprint"],
-                                    connection=conn, lock=True)
+            existing = self._existing_record(conn, record, fingerprint)
             created = not existing
             if existing:
                 memory_id = existing[0]["id"]
                 if unchanged(existing[0]):
                     # Re-ingesting unchanged evidence must not discard its vectors.
                     self.db.update(conn, memory_table, refresh, memory_table.c.id == memory_id)
+                    self._queue_index(conn, memory_id)
                     return memory_id, False
+                self._snapshot_case(conn, existing[0])
                 update_fields = {key: values[key] for key in (
                     "semantics", "pytorch_reference", "summary", "outcome", "evidence_json",
                     "searchable_text", "environment_json", "source_run", "tl_ops_json",
+                    "failure_stage", "error_signature", "test_sha256",
                     "embedding_json", "embedding_provider", "embedding_model", "embedding_dim",
                 )}
                 self.db.update(conn, memory_table, {**update_fields, **refresh}, memory_table.c.id == memory_id)
@@ -458,18 +528,25 @@ class MemoryStore:
                 memory_id = self.db.allocate(conn, "memories")
                 self.db.insert(conn, memory_table, dict(id=memory_id, created_at=now, **values))
             self._insert_chunks(conn, memory_id, chunks, vectors[int(full_ok):] if vectors else None)
+            self._queue_index(conn, memory_id)
         return memory_id, created
 
     def archive(self, memory_id, reason):
         with self.db.transaction() as conn:
-            return self.db.update(conn, memory_table,
+            self.db.lock(conn, "memory-write")
+            changed = self.db.update(conn, memory_table,
                 {"active": 0, "archive_reason": normalize_text(reason), "updated_at": utc_timestamp()},
                 memory_table.c.id == memory_id).rowcount > 0
+            if changed:
+                self._queue_index(conn, memory_id)
+            return changed
 
     @staticmethod
     def _row_dict(row: dict) -> dict:
         item = dict(row)
-        item.pop("workspace_id", None)
+        workspace = item.pop("workspace_id", None)
+        if workspace is not None:
+            item["case_id"] = case_identity(workspace, item["id"])
         for source, destination in (
             ("tl_ops_json", "tl_ops"),
             ("environment_json", "environment"),
@@ -497,6 +574,19 @@ class MemoryStore:
     ) -> list[dict]:
         if limit <= 0:
             return []
+        if score_mode == "qdrant":
+            if candidate_strategy != "record-top5":
+                raise ValueError("qdrant retrieval currently supports record-top5 only")
+            from .indexing.retrieval import retrieve
+            # Index activation and worker progress have independent versions from source cache.
+            # Do not serve cached evidence across these transitions.
+            selected = retrieve(self, query, limit, exclude_source_runs=exclude_source_runs, trace=selection_trace)
+            with self.db.transaction() as conn:
+                for item in selected:
+                    self.db.update(conn, memory_table, {"last_used_at": utc_timestamp()},
+                                   memory_table.c.id == item["id"], memory_table.c.active == 1,
+                                   memory_table.c.case_version == item["case_version"])
+            return selected
         excluded = sorted(set(exclude_source_runs))
         parameters = {"query": asdict(query), "limit": limit, "excluded": excluded,
             "mode": score_mode, "weight": lexical_weight, "strategy": candidate_strategy,
@@ -530,6 +620,8 @@ class MemoryStore:
         """Expose the existing filtered scoring order without recording usage."""
         if score_mode not in RETRIEVAL_MODES:
             raise ValueError(f"unsupported retrieval mode: {score_mode}")
+        if score_mode == "qdrant":
+            raise ValueError("Use retrieve(limit=...) for bounded Qdrant recall")
         if not 0.0 <= lexical_weight <= 1.0:
             raise ValueError("lexical_weight must be between 0 and 1")
         if score_mode in {"embedding", "fusion"} and self.embedding_provider is None:

@@ -10,10 +10,14 @@ CONTEXT_CHARS = 6000
 
 
 def entries(item: dict) -> list[dict]:
+    if item.get("expanded_evidence") is not None:
+        return list(item["expanded_evidence"].get("items", []))
+    if item.get("expansion", {}).get("schema") == "three-layer-v1":
+        return list(item.get("evidence_chain", {}).get("items", []))
     evidence = item.get("evidence") if isinstance(item.get("evidence"), dict) else {}
     chain = evidence.get("chain") or item.get("evidence_chain") or {}
     if chain.get("items"):
-        return list(chain["items"])
+        return _indexed_match(item, list(chain["items"]))
     # Legacy records stay readable; absence of application metadata is not proof of apply.
     result = []
     for key, kind, state in [
@@ -31,11 +35,29 @@ def entries(item: dict) -> list[dict]:
                            "run_id":item.get("source_run"),"pointer":"/evidence/"+key,
                            "text":encode(value),"truncated":bool(key=="patch_excerpt" and evidence.get("patch_truncated")),
                            "time_basis":"unknown","available_at":None})
-    return result
+    return _indexed_match(item, result)
+
+
+def _indexed_match(item, result):
+    matched = item.get("matched_evidence") or {}
+    retrieval = item.get("retrieval") or item.get("score_breakdown") or {}
+    if retrieval.get("mode") != "qdrant" or not matched.get("text"):
+        return result
+    identity = "indexed:" + matched["chunk_id"]
+    if any(e.get("evidence_id") == identity for e in result):
+        return result
+    source = matched.get("provenance", {}).get("source", {})
+    return [{"evidence_id": identity, "kind": "retrieved_chunk",
+             "state": source.get("state", "unknown"), "source": source.get("source") or item.get("source_run"),
+             "pointer": source.get("pointer") or matched.get("source_field"),
+             "run_id": source.get("run_id"), "text": matched["text"],
+             "time_basis": source.get("time_basis", "unknown")}, *result]
 
 
 def ordered(items: list[dict], query_text: str = "") -> list[dict]:
-    order = ["conflict","error","action","patch","validation","test_summary","gap","rationale","log","recommendation","diagnosis","environment","contract","command"]
+    if any("layer" in e for e in items):
+        return sorted(items, key=lambda e: e.get("layer", 2))
+    order = ["retrieved_chunk","conflict","error","action","patch","validation","test_summary","gap","rationale","log","recommendation","diagnosis","environment","contract","command"]
     if any(word in query_text.lower() for word in ("version","environment","版本","环境")):
         order.insert(0, "environment")
     priority = {kind:order.index(kind) for kind in set(order)}
@@ -55,7 +77,7 @@ def bounded_chain(item: dict, *, max_chars: int = 8000, query_text: str = "") ->
     if max_chars < 256:
         raise ValueError("evidence budget must be at least 256 characters")
     evidence = item.get("evidence") if isinstance(item.get("evidence"), dict) else {}
-    original = evidence.get("chain") or item.get("evidence_chain") or {}
+    original = item.get("expanded_evidence") or evidence.get("chain") or item.get("evidence_chain") or {}
     candidates = ordered(entries(item), query_text)
     result = {"schema":"evidence-view-v1", "items":[], "omitted_count":0,
               "truncated":bool(item.get("evidence_chain", {}).get("truncated")),
@@ -66,7 +88,9 @@ def bounded_chain(item: dict, *, max_chars: int = 8000, query_text: str = "") ->
     for entry in candidates:
         shown = {k:v for k,v in entry.items() if k in {
             "evidence_id","kind","state","source","pointer","lines","source_sha256","value_sha256",
-            "run_id","proposal_id","attempt","relation","available_at","time_basis","text","truncated"}}
+            "run_id","proposal_id","attempt","relation","available_at","time_basis","text","truncated",
+            "layer","case_version","chunk_id","part_index","part_count","overlap_may_repeat",
+            "omitted_fields","omitted_units","body_line_ranges"}}
         # Metadata has its own explicit limits, including untrusted paths/IDs.
         for key,value in list(shown.items()):
             if isinstance(value,str):
@@ -93,6 +117,9 @@ def bounded_chain(item: dict, *, max_chars: int = 8000, query_text: str = "") ->
 def render_evidence_context(memories: list[dict], max_chars: int = CONTEXT_CHARS,
                             query_text: str = "", *, allocation: str = "demand",
                             context_format: str = "classic") -> str:
+    if memories and all(item.get("expansion", {}).get("schema") == "three-layer-v1" for item in memories):
+        from codex_agent.memory_context import pack_context
+        return pack_context(memories, max_chars, query_text, allocation=allocation)
     if context_format == "classic":
         return _render_classic_evidence_context(memories, max_chars, query_text)
     if context_format != "compact":

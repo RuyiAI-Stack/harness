@@ -32,6 +32,9 @@ def memory_workspace(repo_root: Path) -> Path:
 def build_configured_embedding_provider():
     """Build an optional provider; lexical retrieval remains the default."""
 
+    if runtime_config().memory.retrievalMode == "qdrant":
+        # The active immutable index definition owns the query model, not legacy settings.
+        return None
     settings = runtime_config().memory.embedding
     return build_embedding_provider(
         settings.provider,
@@ -213,6 +216,12 @@ def _public_item(item: dict[str, Any], query_text: str = "") -> dict[str, Any]:
         "matched_evidence": item.get("matched_evidence"),
         "source_run": item["source_run"],
     }
+    if item.get("expansion"):
+        result["expansion"] = item["expansion"]
+        # Expanded evidence is the single projection. Do not bypass stage selection via legacy flat fields.
+        result.update(evidence=[], recommended_actions=[], reported_cause=None,
+                      attempted_action=None, applied_action=None, patch_excerpt=None,
+                      patch_path=None, patch_truncated=False, validation_result=None)
     # Retain the existing flat fields for clients while bounding untrusted payloads.
     trimmed = False
     for key, value in list(result.items()):
@@ -252,6 +261,7 @@ def retrieve_memories(
     exclude_source_runs: tuple[str, ...] = (),
     limit: int = 5,
     candidate_strategy: CandidateStrategy = "record-top5",
+    task_stage: str | None = None,
 ) -> dict[str, Any]:
     """Return bounded, provenance-preserving historical evidence."""
 
@@ -267,9 +277,12 @@ def retrieve_memories(
     if failure_stage or rule_id or evidence:
         signature = normalized_error_signature(failure_stage, rule_id, evidence)
     diagnostic_text = " ".join([rule_id or "", *evidence])
+    from codex_agent.memory_expansion import resolve_stage, expand_cases
+    stage = resolve_stage(task_stage, diagnostic=bool(failure_stage or rule_id or evidence))
     try:
         provider = build_configured_embedding_provider()
         database = memory_workspace(repo_root)
+        retrieval_trace = {}
         with MemoryStore(database, provider) as store:
             items = store.retrieve(
                 MemoryQuery(
@@ -286,7 +299,10 @@ def retrieve_memories(
                 exclude_source_runs=exclude_source_runs,
                 score_mode=runtime_config().memory.retrievalMode,
                 candidate_strategy=candidate_strategy,
+                selection_trace=retrieval_trace,
             )
+            if runtime_config().memory.retrievalMode == "qdrant":
+                items = expand_cases(store, items, stage, trace=retrieval_trace)
         from codex_agent.memory import render_memory_context
         public = [_public_item(item, semantics + " " + diagnostic_text) for item in items]
         return {
@@ -297,10 +313,12 @@ def retrieve_memories(
                 "operator": operator_name,
                 "failure_stage": failure_stage,
                 "rule_id": rule_id,
+                "task_stage": stage,
             },
             "items": public,
             "context_excerpt": render_memory_context(public, query_text=semantics + " " + diagnostic_text),
             "context_unit": "unicode-characters-not-tokens",
+            "retrieval_trace": retrieval_trace,
         }
     except Exception as error:
         return {

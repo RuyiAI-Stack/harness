@@ -18,8 +18,8 @@ class Broker:
     async def __aenter__(self):
         cfg = runtime_config().queue
         url = os.environ.get(cfg.urlEnv, "")
-        if not cfg.enabled or urlsplit(url).scheme not in {"amqp", "amqps"}:
-            raise ValueError(f"Enable queue and set {cfg.urlEnv} to an AMQP URL")
+        if not (cfg.enabled or runtime_config().indexing.enabled) or urlsplit(url).scheme not in {"amqp", "amqps"}:
+            raise ValueError(f"Enable queue or indexing and set {cfg.urlEnv} to an AMQP URL")
         try:
             self.connection = await aio_pika.connect(url, timeout=5)
             self.channel = await self.connection.channel(publisher_confirms=True, on_return_raises=True)
@@ -29,7 +29,7 @@ class Broker:
             queue = await self.channel.declare_queue(self.prefix + ".dead", durable=True)
             await queue.bind(dead)
             self.queues = {}
-            for kind in ("agent", "validation", "memory"):
+            for kind in ("agent", "validation", "memory", "index"):
                 queue = await self.channel.declare_queue(self.prefix + "." + kind, durable=True,
                     arguments={"x-dead-letter-exchange": dead.name})
                 await queue.bind(self.exchange, routing_key=kind)

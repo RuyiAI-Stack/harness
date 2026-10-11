@@ -73,6 +73,12 @@ jobs:
         options: >-
           --health-cmd="rabbitmq-diagnostics -q ping"
           --health-interval=10s --health-timeout=5s --health-retries=12
+      qdrant:
+        image: qdrant/qdrant:v1.19.2
+        env:
+          QDRANT__TELEMETRY_DISABLED: 'true'
+        ports:
+          - 6333/tcp
     steps:
       - name: Checkout harness
         uses: actions/checkout@v4
@@ -124,4 +130,5 @@ jobs:
           TRITON_MYSQL_URL: mysql+pymysql://root:ci-only-password@127.0.0.1:${{ job.services.mysql.ports['3306'] }}/triton_agent_test
           TRITON_TEST_REDIS_URL: redis://127.0.0.1:${{ job.services.redis.ports['6379'] }}/0
           TRITON_TEST_AMQP_URL: amqp://ci:ci-only-password@127.0.0.1:${{ job.services.rabbitmq.ports['5672'] }}/
+          TRITON_TEST_QDRANT_URL: http://127.0.0.1:${{ job.services.qdrant.ports['6333'] }}
         run: pnpm test:all --reporter=verbose

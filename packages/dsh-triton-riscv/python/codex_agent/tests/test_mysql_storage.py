@@ -25,6 +25,9 @@ from codex_agent.tests.test_memory import FakeEmbeddingProvider, record
 
 
 def insert_legacy(conn, table, row):
+    # The fixture deliberately represents the frozen SQLite v4 schema.
+    allowed = {column[1] for column in conn.execute('PRAGMA table_info("' + table + '")')}
+    row = {key: value for key, value in row.items() if key in allowed}
     names = ", ".join('"' + name + '"' for name in row)
     conn.execute('INSERT INTO "' + table + '" (' + names + ') VALUES (' +
                  ",".join("?" for _ in row) + ")", tuple(row.values()))

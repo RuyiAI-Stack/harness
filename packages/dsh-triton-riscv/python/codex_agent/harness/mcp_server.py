@@ -9,7 +9,9 @@ from typing import Any, Literal
 from mcp.server import MCPServer
 from mcp.types import ToolAnnotations
 from codex_agent.memory_api import MemoryRetrievalToolResult, retrieve_operator_memory
+from codex_agent.memory_expansion import TaskStage
 from codex_agent.memory_selection import CandidateStrategy
+from codex_agent.runtime_config import runtime_config
 
 from codex_agent.operator_development import (
     ApplyDevelopmentResult,
@@ -42,6 +44,11 @@ from codex_agent.remote_executor import (
     check_remote_environment,
 )
 
+
+# MCP schemas are discovered at process startup, just like the host configuration.
+ToolCandidateStrategy = (
+    Literal["record-top5"] if runtime_config().memory.retrievalMode == "qdrant" else CandidateStrategy
+)
 
 server = MCPServer(
     name="triton-riscv-tools",
@@ -107,12 +114,19 @@ def retrieve_operator_memory_tool(
     operator_name: str = "", run_id: str | None = None, semantics: str = "",
     pytorch_reference: str = "", failure_stage: str | None = None,
     error_text: str = "", limit: int = 5,
-    candidate_strategy: CandidateStrategy = "record-top5",
+    candidate_strategy: ToolCandidateStrategy = "record-top5",
+    task_stage: TaskStage | None = None,
 ) -> MemoryRetrievalToolResult:
-    """Retrieve source-bound historical evidence; never treat it as current execution proof."""
+    """Retrieve historical evidence, never current proof.
+
+    run_id is optional: use only an actual validation receipt ID (run-...), never
+    the platform run or Harness session ID. Omit it for a general history search.
+    task_stage selects context evidence, not ranking or permissions.
+    Qdrant exposes only record-top5; other configured backends may expose experimental strategies.
+    """
     return retrieve_operator_memory(repository_root(), operator_name, run_id=run_id,
         semantics=semantics, pytorch_reference=pytorch_reference, failure_stage=failure_stage,
-        error_text=error_text, limit=limit, candidate_strategy=candidate_strategy)
+        error_text=error_text, limit=limit, candidate_strategy=candidate_strategy, task_stage=task_stage)
 
 
 def _submit_validation_task(root, operator, run_id):

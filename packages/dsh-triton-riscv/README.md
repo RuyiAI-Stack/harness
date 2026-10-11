@@ -94,13 +94,14 @@ See [backend options](python/codex_agent/README.md#redis-options).
 
 ### Development Tests
 
-Vitest drives JavaScript, Python and native-host integration tests. After setup,
+Vitest drives JavaScript, existing Python regressions, frontend and native-host integration tests. After setup,
 from the plugin directory, configure **disposable** services (never production):
 
 ```sh
 export TRITON_MYSQL_URL='mysql+pymysql://USER:PASSWORD@127.0.0.1:3306/triton_agent_test'
 export TRITON_TEST_REDIS_URL='redis://127.0.0.1:6379/0'
 export TRITON_TEST_AMQP_URL='amqp://guest:guest@127.0.0.1:5672/'
+export TRITON_TEST_QDRANT_URL='http://127.0.0.1:6333'
 .venv/bin/python -I -m codex_agent.storage upgrade
 npm test
 ```

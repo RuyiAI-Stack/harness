@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import tempfile
+import json
+import os
 import unittest
 import sys
 import types
@@ -42,6 +44,24 @@ class FakeHarnessBackend:
 
 
 class HarnessIntegrationTests(unittest.TestCase):
+    def test_declared_index_credentials_reach_sdk_without_other_secrets(self) -> None:
+        module = types.ModuleType("deepseek_harness")
+        module.DeepSeekHarness = lambda **kwargs: SimpleNamespace(kwargs=kwargs)
+        document = {"schemaVersion": 1, "repoRoot": "/workspace", "stateDir": "/workspace/state", "indexing": {"enabled": True,
+            "modelRevision": "pinned", "apiKeyEnv": "PRIVATE_VECTOR_KEY",
+            "embedding": {"provider": "openai-compatible", "model": "bge",
+                          "apiKeyEnv": "PRIVATE_EMBED_KEY"}}}
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(sys.modules, {"deepseek_harness": module}), \
+             patch.dict(os.environ, {"TRITON_RISCV_CONFIG": json.dumps(document),
+                 "PRIVATE_VECTOR_KEY": "vector-test-key", "PRIVATE_EMBED_KEY": "embedding-test-key",
+                 "UNRELATED_SECRET": "must-not-forward"}, clear=True):
+            settings = HarnessSettings.from_env(Path(temporary), {"ISRC_API_KEY": "test-key"})
+            runtime = DeepSeekHarnessBackend(settings)._runtime()
+            env = runtime.kwargs["env"]
+            self.assertEqual(env["PRIVATE_VECTOR_KEY"], "vector-test-key")
+            self.assertEqual(env["PRIVATE_EMBED_KEY"], "embedding-test-key")
+            self.assertNotIn("UNRELATED_SECRET", env)
+
     def test_settings_are_loaded_without_exposing_secret(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

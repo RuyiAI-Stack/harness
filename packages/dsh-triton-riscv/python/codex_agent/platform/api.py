@@ -90,6 +90,8 @@ def create_app(
     app.state.service = service
     app.state.executor = executor
     app.state.tasks = tasks
+    from codex_agent.orchestration.api import router as workflow_router
+    app.include_router(workflow_router(root))
     if react_frontend_available:
         app.mount(
             "/ui-assets",
