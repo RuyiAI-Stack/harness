@@ -57,15 +57,24 @@
     transport: stdio
     command: !!js process.env.TRITON_RISCV_MCP_PYTHON
     args: ['-I', '-m', 'codex_agent.harness.mcp_server']
-    env:
-      TRITON_RISCV_REPO_ROOT: !!js process.env.DSH_CWD ?? process.cwd()
-      TRITON_RISCV_ALLOW_VALIDATION: !!js process.env.TRITON_RISCV_ALLOW_VALIDATION ?? '0'
-      TRITON_RISCV_ALLOW_REPAIR_APPLY: !!js process.env.TRITON_RISCV_ALLOW_REPAIR_APPLY ?? '0'
-      TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY: !!js process.env.TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY ?? '0'
-      TRITON_RISCV_REQUIRE_REMOTE: !!js process.env.TRITON_RISCV_REQUIRE_REMOTE ?? '0'
-      TRITON_RISCV_REQUIRE_APPROVED_VALIDATION: !!js process.env.TRITON_RISCV_REQUIRE_APPROVED_VALIDATION ?? '1'
-      RISCV_HOST: !!js process.env.RISCV_HOST ?? ''
-      RISCV_REPO: !!js process.env.RISCV_REPO ?? ''
+    # The host scrubs credential-shaped ambient names. Forward only declared tool credentials.
+    env: !!js >-
+      (() => {
+        const c = JSON.parse(process.env.TRITON_RISCV_CONFIG ?? '{}');
+        const keys = ['TRITON_RISCV_CONFIG', 'TRITON_RISCV_STATE_DIR',
+          'TRITON_RISCV_ALLOW_VALIDATION', 'TRITON_RISCV_ALLOW_REPAIR_APPLY',
+          'TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY', 'TRITON_RISCV_REQUIRE_REMOTE',
+          'TRITON_RISCV_REQUIRE_APPROVED_VALIDATION', 'RISCV_HOST', 'RISCV_REPO',
+          c.storage?.urlEnv ?? 'TRITON_MYSQL_URL',
+          c.memory?.embedding?.apiKeyEnv ?? 'AGENT_EMBEDDING_API_KEY'];
+        if (c.cache?.enabled) keys.push(c.cache.urlEnv ?? 'TRITON_REDIS_URL');
+        if (c.queue?.enabled || c.indexing?.enabled) keys.push(c.queue?.urlEnv ?? 'TRITON_AMQP_URL');
+        if (c.indexing?.enabled) keys.push(c.indexing.apiKeyEnv ?? 'TRITON_QDRANT_API_KEY',
+          c.indexing.embedding?.apiKeyEnv ?? 'AGENT_EMBEDDING_API_KEY');
+        return { TRITON_RISCV_REPO_ROOT: process.env.DSH_CWD ?? process.cwd(),
+          TRITON_RISCV_REQUIRE_APPROVED_VALIDATION: '1',
+          ...Object.fromEntries(keys.filter(k => process.env[k] !== undefined).map(k => [k, process.env[k]])) };
+      })()
     cwd: !!js process.env.DSH_CWD ?? process.cwd()
     # A real Triton-RISCV compile/test commonly exceeds 30 seconds.
     toolCallTimeoutMs: 960000

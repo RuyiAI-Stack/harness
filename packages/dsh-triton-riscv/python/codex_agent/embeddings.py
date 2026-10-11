@@ -8,6 +8,7 @@ import math
 import os
 import urllib.request
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Protocol
 
 
@@ -39,21 +40,26 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
     return max(-1.0, min(1.0, numerator / (left_norm * right_norm)))
 
 
+@lru_cache(maxsize=1)
+def _sentence_encoder(model, revision):
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError as exc:
+        raise RuntimeError("sentence-transformers is not installed; install it or disable embeddings") from exc
+    return SentenceTransformer(model, revision=revision, trust_remote_code=False,
+                               model_kwargs={"weights_only": True})
+
+
 @dataclass
 class SentenceTransformerEmbeddingProvider:
     """Optional local provider; sentence-transformers is imported lazily."""
 
     model: str = "sentence-transformers/all-MiniLM-L6-v2"
     name: str = "sentence-transformers"
+    revision: str | None = None
 
     def __post_init__(self) -> None:
-        try:
-            from sentence_transformers import SentenceTransformer
-        except ImportError as exc:
-            raise RuntimeError(
-                "sentence-transformers is not installed; install it or disable embeddings"
-            ) from exc
-        self._encoder = SentenceTransformer(self.model)
+        self._encoder = _sentence_encoder(self.model, self.revision)
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         vectors = self._encoder.encode(texts, normalize_embeddings=True)
@@ -200,6 +206,7 @@ def build_embedding_provider(
     tokenizer_json: str | None = None,
     token_budget: int | None = None,
     use_environment: bool = True,
+    revision: str | None = None,
 ) -> EmbeddingProvider | None:
     """Build an optional provider without making an embedding request."""
     env = os.environ if use_environment else {}
@@ -207,7 +214,7 @@ def build_embedding_provider(
         return None
     if provider == "sentence-transformers":
         return SentenceTransformerEmbeddingProvider(
-            model=model or "sentence-transformers/all-MiniLM-L6-v2"
+            model=model or "sentence-transformers/all-MiniLM-L6-v2", revision=revision,
         )
     if provider == "ollama":
         resolved_model = model or env.get("AGENT_EMBEDDING_MODEL")

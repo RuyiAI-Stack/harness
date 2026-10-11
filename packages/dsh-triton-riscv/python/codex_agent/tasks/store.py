@@ -39,10 +39,11 @@ def now_ms(conn):
 
 
 class JobStore:
-    def __init__(self, root):
-        self.db = WorkspaceDatabase(root)
-        self.db.register()
-        self.platform = PlatformStore(root)
+    def __init__(self, root, *, database=None):
+        self.db = database or WorkspaceDatabase(root)
+        if database is None:
+            self.db.register()
+        self.platform = PlatformStore(root, database=self.db)
         self.config = runtime_config().queue
 
     def _row(self, conn, table, identifier, *, lock=False):
@@ -67,7 +68,7 @@ class JobStore:
         return next(iter(self.db.rows(jobs, jobs.c.idempotency_key == digest(key), connection=conn)), None)
 
     def submit(self, kind, payload, key, *, run_id=None, connection=None):
-        if kind not in {"agent", "validation", "memory"}:
+        if kind not in {"agent", "validation", "memory", "index"}:
             raise ValueError("unsupported job kind")
         if not isinstance(key, str) or not 1 <= len(key) <= 160:
             raise ValueError("idempotency key must contain 1..160 characters")
@@ -83,8 +84,9 @@ class JobStore:
                     raise Conflict("idempotency key reused with different task input")
                 return self.public(previous)
             count = conn.execute(select(func.count()).select_from(jobs).where(
-                *self.db.predicate(jobs, jobs.c.status.not_in(TERMINAL)))).scalar_one()
-            if kind != "memory" and count >= self.config.maxPending:
+                *self.db.predicate(jobs, jobs.c.status.not_in(TERMINAL),
+                                   jobs.c.kind.in_(["agent", "validation"])))).scalar_one()
+            if kind not in {"memory", "index"} and count >= self.config.maxPending:
                 raise Conflict("workspace task capacity reached")
             latest = conn.execute(select(func.max(jobs.c.created_ms)).where(*self.db.predicate(jobs))).scalar_one()
             now, identifier = max(now_ms(conn), (latest or 0) + 1), secrets.token_hex(16)
@@ -159,7 +161,7 @@ class JobStore:
                 or_(jobs.c.status.in_(["running", "needs-reconciliation"]),
                     and_(jobs.c.status == "queued", or_(jobs.c.created_ms < job["created_ms"],
                         and_(jobs.c.created_ms == job["created_ms"], jobs.c.id < job["id"])))), connection=conn)
-            if blockers and kind != "memory":
+            if blockers and kind not in {"memory", "index"}:
                 self._retry_queued(conn, job, 1000)
                 return None
             now, owner = now_ms(conn), secrets.token_hex(16)
@@ -199,10 +201,10 @@ class JobStore:
                 raise LeaseLost("task cancellation requested before effects")
             self.db.update(conn, jobs, {"effects_started": 1}, jobs.c.id == identifier)
 
-    def finish(self, identifier, owner, status, result, *, followup=None):
+    def finish(self, identifier, owner, status, result, *, followup=None, connection=None):
         if status not in TERMINAL | {"needs-reconciliation"}:
             raise ValueError("invalid completion status")
-        with self.db.transaction() as conn:
+        with nullcontext(connection) if connection is not None else self.db.transaction() as conn:
             job = self.require_owner(conn, identifier, owner)
             now = now_ms(conn)
             self.db.update(conn, jobs, dict(status=status, result_json=encode(result),
@@ -248,7 +250,7 @@ class JobStore:
                 .limit(50).with_for_update(skip_locked=True)).mappings().all()
             for row in rows:
                 job = dict(row)
-                status = "needs-reconciliation" if job["effects_started"] and job["kind"] != "memory" else "queued"
+                status = "needs-reconciliation" if job["effects_started"] and job["kind"] not in {"memory", "index"} else "queued"
                 persisted = self.db.rows(runs, runs.c.id == job["run_id"], connection=conn) if job["run_id"] else []
                 completed = persisted and persisted[0]["status"] in {"completed", "failed", "cancelled"}
                 if completed:
@@ -270,6 +272,22 @@ class JobStore:
                 self._run_status(conn, job, status, reason)
                 recovered.append({"job_id": job["id"], "status": status})
         return recovered
+
+    def retry_index(self, identifier, owner, result):
+        """Only idempotent index writes can replay after a known worker failure."""
+        with self.db.transaction() as conn:
+            job = self.require_owner(conn, identifier, owner)
+            if job["kind"] != "index":
+                raise ValueError("automatic effectful retry is restricted to index jobs")
+            if job["cancel_requested"] or job["attempt"] >= self.config.maxAttempts:
+                self.finish(identifier, owner, "cancelled" if job["cancel_requested"] else "dead",
+                            result, connection=conn)
+                return
+            self.db.update(conn, attempts, dict(status="retry", result_json=encode(result), finished_ms=now_ms(conn)),
+                           attempts.c.job_id == identifier, attempts.c.number == job["attempt"])
+            self.db.update(conn, inbox, dict(status="completed", finished_ms=now_ms(conn)), inbox.c.job_id == identifier)
+            self.db.update(conn, jobs, {"result_json": encode(result)}, jobs.c.id == identifier)
+            self._retry_queued(conn, job, min(30000, 1000 * 2 ** job["attempt"]))
 
     def reconcile(self, identifier, note):
         if not note.strip():

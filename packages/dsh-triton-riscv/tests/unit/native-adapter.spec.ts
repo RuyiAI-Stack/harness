@@ -451,6 +451,31 @@ test('bounded context retains IDs; no partial semantic contract presented as com
   assert.ok(text.length < 19000)
 })
 
+test('host lifecycle supplies a deterministic retrieval stage and keeps returned context', async () => {
+  const h = harness(),
+    s = session('stage-routing')
+  await h.call(s, 'discover_operator', { operator_name: 'new' }, { operator: { name: 'new' } })
+  assert.equal(h.seen.at(-1).query.task_stage, 'lookup')
+  await h.call(
+    s,
+    'prepare_operator_development',
+    { specification: { semantics: 'x*x', pytorch_reference: 'torch.square(x)' } },
+    { operator: 'new', development_id: 'dev-1' },
+  )
+  assert.equal(h.seen.at(-1).query.task_stage, 'generation')
+  await h.call(s, 'validate_operator', { operator_name: 'new' }, { operator: 'new', run_id: 'run-1', status: 'failed' })
+  assert.equal(h.seen.at(-1).query.task_stage, 'repair')
+  await h.call(s, 'diagnose_failure', { run_id: 'run-1' }, { operator: 'new', run_id: 'run-1' })
+  assert.equal(h.seen.at(-1).query.task_stage, 'diagnosis')
+  assert.match(h.context(s), /historical evidence #7/)
+})
+
+test('context budget uses Unicode characters consistently with the Python packer', () => {
+  const text = contextText({ task: { operator: 'new' }, contract: null, memory: { text: '😀'.repeat(4000) } })
+  assert.ok(text.includes('😀'.repeat(4000)))
+  assert.ok(!text.includes('exceeds 6000'))
+})
+
 test('applied source invalidates a stale passing receipt in task context', async () => {
   const h = harness(),
     s = session('s1')
@@ -503,6 +528,32 @@ test('queued validation is not a receipt and only its owning session can collect
   )
   assert.match(h.context(s), /receipt-1/)
   assert.match(h.context(s), /passed/)
+})
+
+test('collected failed async validation automatically retrieves repair context', async () => {
+  const h = harness(),
+    s = session('async-repair')
+  await plan(h, s)
+  await h.call(
+    s,
+    'execute_approved_validation',
+    { run_id: 'run-1' },
+    { status: 'queued', job_id: 'async-1', run_id: 'run-1' },
+  )
+  await h.call(
+    s,
+    'inspect_queued_task',
+    { job_id: 'async-1' },
+    {
+      kind: 'validation',
+      status: 'succeeded',
+      result: { status: 'failed', operator: 'add', run_id: 'receipt-failed', receipt_path: 'receipt.json' },
+    },
+  )
+  assert.equal(h.seen.at(-1).action, 'memory')
+  assert.equal(h.seen.at(-1).query.task_stage, 'repair')
+  assert.equal(h.seen.at(-1).query.run_id, 'receipt-failed')
+  assert.match(h.context(s), /historical evidence #7/)
 })
 
 test('a committed replay uses business checks without another approval dialog', async () => {

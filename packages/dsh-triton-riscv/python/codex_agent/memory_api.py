@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from codex_agent.diagnostic_memory import retrieve_memories
 from codex_agent.failure_diagnosis import diagnose_log
 from codex_agent.memory_selection import CandidateStrategy
+from codex_agent.memory_expansion import TaskStage
 from codex_agent.operator_tools import discover_operator_evidence
 
 
@@ -38,6 +39,7 @@ class RetrievedMemoryCase(BaseModel):
     evidence_chain: dict[str, Any] = Field(default_factory=dict)
     output_truncated: bool = False
     output_budget_chars: int | None = None
+    expansion: dict[str, Any] = Field(default_factory=dict)
 
 
 class MemoryRetrievalToolResult(BaseModel):
@@ -49,6 +51,7 @@ class MemoryRetrievalToolResult(BaseModel):
     warning: str | None = None
     context_excerpt: str | None = None
     context_unit: str | None = None
+    retrieval_trace: dict[str, Any] = Field(default_factory=dict)
 
 
 def retrieve_operator_memory(
@@ -56,16 +59,35 @@ def retrieve_operator_memory(
     semantics: str = "", pytorch_reference: str = "",
     failure_stage: str | None = None, error_text: str = "", limit: int = 5,
     candidate_strategy: CandidateStrategy = "record-top5",
+    task_stage: TaskStage | None = None,
+    exclude_source_runs: tuple[str, ...] = (),
 ) -> MemoryRetrievalToolResult:
     root = repo_root.resolve()
     rule_id = None
     evidence = [error_text] if error_text.strip() else []
     environment: dict[str, Any] = {}
-    excluded: tuple[str, ...] = ()
+    excluded = exclude_source_runs
     if run_id:
         if not run_id or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for c in run_id):
             raise ValueError("run_id contains unsupported characters")
-        receipt = json.loads((root / "agent-results/operator-lifecycle/receipts" / f"{run_id}.json").read_text())
+        receipt_path = root / "agent-results/operator-lifecycle/receipts" / f"{run_id}.json"
+        try:
+            receipt_text = receipt_path.read_text()
+        except FileNotFoundError:
+            return MemoryRetrievalToolResult(
+                status="unavailable", database="not-opened",
+                query={"operator_name": operator_name, "run_id": run_id},
+                warning=(
+                    "No validation receipt exists for this run_id. It must be a validation "
+                    "receipt ID returned by a validation tool (run-...), not a conversation, "
+                    "platform run or Harness session ID. No retrieval was performed. "
+                    "For a general history search, omit run_id and supply operator_name "
+                    "with semantics/error_text. To diagnose a particular validation, "
+                    "supply its actual receipt ID; do not guess another ID."
+                ),
+                retrieval_trace={"error": "validation-receipt-not-found"},
+            )
+        receipt = json.loads(receipt_text)
         if operator_name and operator_name != receipt.get("operator"):
             raise ValueError("operator_name does not match the validation receipt")
         operator_name = receipt["operator"]
@@ -84,7 +106,7 @@ def retrieve_operator_memory(
             "execution_mode": receipt.get("execution_mode"),
             "triton": receipt.get("triton_version") or remote.get("triton_version"),
         }
-        excluded = (f"operator-lifecycle:{run_id}",)
+        excluded = tuple(dict.fromkeys((*excluded, f"operator-lifecycle:{run_id}")))
     if not operator_name:
         raise ValueError("operator_name or run_id is required")
     found = discover_operator_evidence(root, operator_name)
@@ -95,5 +117,6 @@ def retrieve_operator_memory(
         failure_stage=failure_stage, rule_id=rule_id, evidence=evidence,
         environment=environment, exclude_source_runs=excluded, limit=limit,
         candidate_strategy=candidate_strategy,
+        task_stage=task_stage,
     )
     return MemoryRetrievalToolResult.model_validate(result)

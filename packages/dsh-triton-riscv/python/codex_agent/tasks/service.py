@@ -21,7 +21,7 @@ class TaskService:
         self.root = root.resolve()
         self.jobs = JobStore(self.root)
 
-    def submit_validation(self, operator, approved_run_id, key):
+    def submit_validation(self, operator, approved_run_id, key, *, connection=None, workflow_id=None):
         key = request_key("validation", key)
         if not runtime_config().queue.enabled:
             raise ValueError("queue execution is disabled")
@@ -33,9 +33,12 @@ class TaskService:
         seal = approval_digest(self.root, "validation", plan)
         if plan.get("approval_digest") != seal:
             raise PermissionError("approved plan changed; request approval again")
-        return self.jobs.submit("validation", {"operator": operator, "approved_run_id": approved_run_id,
+        payload = {"operator": operator, "approved_run_id": approved_run_id,
             "approval_digest": seal, "source_env": plan.get("source_env", True),
-            "timeout_seconds": plan.get("timeout_seconds", 900), "remote_identity": remote_execution_identity()}, key)
+            "timeout_seconds": plan.get("timeout_seconds", 900), "remote_identity": remote_execution_identity()}
+        if workflow_id is not None:
+            payload["workflow_id"] = workflow_id
+        return self.jobs.submit("validation", payload, key, connection=connection)
 
     def submit_turn(self, platform, session_id, text, key):
         key = request_key("agent", key)

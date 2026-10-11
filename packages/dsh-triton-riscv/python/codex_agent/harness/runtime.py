@@ -83,7 +83,11 @@ class DeepSeekHarnessBackend:
         }
         from codex_agent.runtime_config import CONFIG_ENV, runtime_config
         config = runtime_config()
-        for key in (CONFIG_ENV, config.storage.urlEnv, config.cache.urlEnv, config.queue.urlEnv):
+        credential_keys = [config.storage.urlEnv, config.cache.urlEnv, config.queue.urlEnv,
+                           config.memory.embedding.apiKeyEnv]
+        if config.indexing.enabled:
+            credential_keys.extend([config.indexing.apiKeyEnv, config.indexing.embedding.apiKeyEnv])
+        for key in (CONFIG_ENV, *credential_keys):
             if os.environ.get(key):
                 runtime_env[key] = os.environ[key]
         for name, value in os.environ.items():

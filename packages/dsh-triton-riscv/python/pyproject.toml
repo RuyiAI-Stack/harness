@@ -12,6 +12,7 @@ dependencies = ["pydantic>=2.11,<3", "mcp==2.1.1", "fastapi>=0.115", "httpx>=0.2
 
 [project.optional-dependencies]
 workbench = ["deepseek-harness-sdk==0.1.1rc1", "openai>=2,<3"]
+embedding-client = ["tokenizers>=0.20,<0.23"]
 embedding = ["sentence-transformers>=3", "tokenizers>=0.20", "openai>=2,<3"]
 
 [project.scripts]
@@ -29,4 +30,4 @@ testpaths = ["codex_agent/tests"]
 norecursedirs = ["fixtures"]
 
 [tool.setuptools.package-data]
-codex_agent = ["*.json", "README.md", "specs/*.json", "tests/fixtures/*.json", "tests/fixtures/*.sql", "harness/*.yml", "harness/bundle/*", "harness/bundle/lib/*.js", "harness/bundle/prompts/*.md", "frontend/dist/*", "frontend/dist/assets/*", "storage/migrations/*.py", "storage/migrations/versions/*.py"]
+codex_agent = ["*.json", "README.md", "specs/*.json", "tests/fixtures/*.json", "tests/fixtures/*.sql", "harness/*.yml", "harness/bundle/*", "harness/bundle/lib/*.js", "harness/bundle/prompts/*.md", "orchestration/*.mjs", "frontend/dist/*", "frontend/dist/assets/*", "storage/migrations/*.py", "storage/migrations/versions/*.py"]

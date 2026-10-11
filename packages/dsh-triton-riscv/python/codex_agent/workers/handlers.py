@@ -7,7 +7,7 @@ from codex_agent.artifacts import ArtifactStore
 from codex_agent.tasks.store import JobStore, LeaseLost, encode
 
 
-def execute_job(root, identifier, owner):
+def execute_job(root, identifier, owner, *, proposal_agent=None):
     jobs = JobStore(root)
     with jobs.db.transaction() as conn:
         job = jobs.require_owner(conn, identifier, owner)
@@ -15,7 +15,24 @@ def execute_job(root, identifier, owner):
     artifacts = ArtifactStore(root)
     followup = None
     try:
+        from codex_agent.runtime_config import runtime_config
+        if job["kind"] == "index":
+            from codex_agent.indexing.worker import execute_index
+            execute_index(jobs, job, owner)
+            return
+        if not runtime_config().queue.enabled:
+            raise PermissionError("task queue is disabled")
         if job["kind"] == "agent":
+            if payload.get("mode") == "operator-workflow":
+                if not runtime_config().queue.proposalWorkflows:
+                    raise PermissionError("proposal workflow adapter is not enabled")
+                if proposal_agent is None:
+                    from codex_agent.harness import HarnessSettings
+                    from codex_agent.orchestration.runtime import RoleAgent
+                    proposal_agent = RoleAgent(HarnessSettings.from_env(root))
+                from codex_agent.orchestration.coordinator import execute_workflow
+                execute_workflow(jobs, job, owner, agent=proposal_agent)
+                return
             from codex_agent.harness import HarnessAgent, HarnessSettings
             from codex_agent.platform.executor import HarnessRunExecutor
             from codex_agent.platform.store import PlatformStore
@@ -67,7 +84,7 @@ def execute_job(root, identifier, owner):
                 log.relative_to(root)
                 if log.is_file() and log.stat().st_size <= 16 * 1024 * 1024:
                     artifacts.put(jobs, identifier, owner, "validation.log", log.read_bytes())
-        else:
+        elif job["kind"] == "memory":
             from codex_agent.diagnostic_memory import remember_validation
             from codex_agent.validation_evidence import audit_validation_receipt
             path = (root / payload["receipt_path"]).resolve()
@@ -86,8 +103,19 @@ def execute_job(root, identifier, owner):
             if result.get("status") == "unavailable":
                 result = {"status": "unavailable", "reason": "memory storage unavailable; original validation unchanged"}
             status = "succeeded" if result["status"] in {"recorded", "deduplicated"} else "failed"
+        else:
+            raise ValueError("unsupported worker kind")
         artifacts.put(jobs, identifier, owner, "result.json", encode(result).encode())
         jobs.finish(identifier, owner, status, result, followup=followup)
+        if job["kind"] == "validation" and payload.get("workflow_id"):
+            try:
+                from codex_agent.orchestration.lifecycle import collect_finished_validation
+                collect_finished_validation(root, payload["workflow_id"], identifier)
+            except Exception:
+                # Validation is already durable. Never rerun it because the parent
+                # checkpoint update failed; the host can collect the same receipt.
+                import warnings
+                warnings.warn("Validation committed; workflow collection is pending. Use collect-validation to retry.", RuntimeWarning)
     except LeaseLost:
         raise
     except Exception as error:
@@ -95,6 +123,12 @@ def execute_job(root, identifier, owner):
         result = {"error_type": type(error).__name__, "reason": "Worker failed; inspect task artifacts and evidence"}
         if isinstance(error, PermissionError):
             result["reason"] = "Validation inputs or authorization changed; review a new plan. Unknown execution still requires reconciliation."
+            if payload.get("mode") == "operator-workflow":
+                result["reason"] = "Proposal workflow adapter is not enabled; ordinary chat is unchanged."
+        if job["kind"] == "index":
+            result["reason"] = "Index attempt failed; check embedding/tokenizer configuration and vector service. Source memory is unchanged."
+            jobs.retry_index(identifier, owner, result)
+            return
         current = jobs.get(identifier)
         status = "needs-reconciliation" if current["effects_started"] and job["kind"] != "memory" else "failed"
         jobs.finish(identifier, owner, status, result)

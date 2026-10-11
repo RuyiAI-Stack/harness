@@ -3,6 +3,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { loadLocalEnvironment } from '../../scripts/local-environment.mjs'
+import { configFromEnvironment } from '../../lib/config.js'
 
 const roots: string[] = []
 function fixture(model?: string, local?: Record<string, unknown>) {
@@ -18,6 +19,41 @@ afterEach(() => {
 })
 
 describe('shared local launcher environment', () => {
+  it('shares structured retrieval settings between workbench and native launcher', () => {
+    const root = fixture()
+    writeFileSync(
+      join(root, '.state/runtime.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        repoRoot: '/operators',
+        stateDir: '/operator-state',
+        memory: { retrievalMode: 'qdrant' },
+      }),
+    )
+    writeFileSync(join(root, '.state/services.env'), 'TRITON_MYSQL_URL=mysql+pymysql://test@localhost/test\n')
+    const env = loadLocalEnvironment(root, {})
+    expect(env.TRITON_RISCV_REPO_ROOT).toBe('/operators')
+    expect(JSON.parse(env.TRITON_RISCV_CONFIG).memory.retrievalMode).toBe('qdrant')
+    expect(configFromEnvironment(env).memory.retrievalMode).toBe('qdrant')
+    expect(env.TRITON_MYSQL_URL).toContain('test@localhost')
+  })
+  it('rejects broken structured config without disclosing its contents', () => {
+    const root = fixture()
+    writeFileSync(join(root, '.state/runtime.json'), 'private-invalid-data')
+    expect(() => loadLocalEnvironment(root, {})).toThrow('Invalid .state/runtime.json')
+    expect(() => configFromEnvironment({ TRITON_RISCV_CONFIG: 'private-invalid-data' })).toThrow(
+      'Invalid TRITON_RISCV_CONFIG',
+    )
+    writeFileSync(join(root, '.state/services.env'), 'PATH=/untrusted')
+    expect(() => loadLocalEnvironment(root, {})).toThrow('Unsupported setting')
+  })
+  it('does not override explicit service credentials or runtime documents', () => {
+    const root = fixture()
+    writeFileSync(join(root, '.state/services.env'), 'TRITON_MYSQL_URL=local-only')
+    writeFileSync(join(root, '.state/runtime.json'), 'unused-invalid')
+    const env = { TRITON_MYSQL_URL: 'explicit', TRITON_RISCV_CONFIG: '{}' }
+    expect(loadLocalEnvironment(root, env)).toEqual(env)
+  })
   it('preserves the existing environment when local files are absent', () => {
     const ambient = { DSH_MODEL: 'old-model', PATH: '/bin' }
     const result = loadLocalEnvironment(fixture(), ambient)
