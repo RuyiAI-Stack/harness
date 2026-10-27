@@ -307,12 +307,6 @@ class WorkflowLifecycleTests(unittest.TestCase):
             self.submit(specification=spec)
         self.assertFalse(self.jobs.db.rows(jobs))
 
-    def test_semantic_role_cannot_replace_the_frozen_contract(self):
-        self.backend.decision = "request_semantics"
-        result = self.execute(self.submit(specification=valid_spec()))
-        self.assertEqual(result["result"]["workflow_state"], "blocked")
-        self.assertFalse((self.root / operator_paths("square_new")[0]).exists())
-
     def test_missing_role_artifact_blocks_publication(self):
         job = self.submit(specification=valid_spec())
         self.execute(job)

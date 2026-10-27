@@ -50,6 +50,8 @@ class WorkspaceDatabase:
         self.root = Path(root).resolve()
         self.workspace_id = hashlib.sha256(str(self.root).encode()).hexdigest()
         self.engine = engine()
+        from codex_agent.accounts.guard import check_workspace
+        check_workspace(self.root)
         self.task_guard = None
         self.cache_namespace = hashlib.sha256(
             self.engine.url.render_as_string(hide_password=True).encode()).hexdigest()[:24]
@@ -62,12 +64,16 @@ class WorkspaceDatabase:
         borrowed = _read_connection.get()
         if borrowed and borrowed[0] is self.engine:
             try:
+                from codex_agent.accounts.guard import check_workspace
+                check_workspace(self.root, borrowed[1])
                 yield borrowed[1]
             except SQLAlchemyError:
                 raise StorageError("MySQL cached read failed; check service and schema") from None
             return
         try:
             with self.engine.begin() as connection:
+                from codex_agent.accounts.guard import check_workspace
+                check_workspace(self.root, connection)
                 connection.info["cache_changes"] = set()
                 try:
                     if self.task_guard is not None:

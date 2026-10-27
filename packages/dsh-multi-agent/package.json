@@ -1,0 +1,48 @@
+{
+  "name": "dsh-multi-agent",
+  "version": "0.1.0",
+  "description": "Trusted isolated typed task runs for DeepSeek Harness",
+  "license": "MIT AND Apache-2.0",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./policy": "./python/dsh_multi_agent/role-policy.mjs",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "lib",
+    "python/pyproject.toml",
+    "python/LICENSE*",
+    "python/dsh_multi_agent/*.py",
+    "python/dsh_multi_agent/*.mjs",
+    "scripts",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE*",
+    "pnpm-lock.yaml"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "setup:backend": "bash scripts/setup-backend.sh",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.8"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

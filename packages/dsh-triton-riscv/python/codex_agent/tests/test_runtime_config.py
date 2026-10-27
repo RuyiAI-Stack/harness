@@ -146,7 +146,7 @@ class RuntimeConfigTests(unittest.TestCase):
                 build_configured_embedding_provider()
         with patch.dict(os.environ, {"TRITON_RISCV_EMBEDDING_PROVIDER": "ollama",
                                     "AGENT_EMBEDDING_MODEL": "legacy-model"}, clear=True), patch(
-                "codex_agent.embeddings.OllamaEmbeddingProvider") as provider:
+                "dsh_vector_retrieval.embeddings.OllamaEmbeddingProvider") as provider:
             build_configured_embedding_provider()
             self.assertEqual(provider.call_args.kwargs["model"], "legacy-model")
 
@@ -156,7 +156,7 @@ class RuntimeConfigTests(unittest.TestCase):
                        "baseUrl": "https://example.invalid/v1", "apiKeyEnv": "MY_SECRET"}})
         with patch.dict(os.environ, {CONFIG_ENV: raw, "MY_SECRET": "private-value",
                                     "AGENT_EMBEDDING_TOKEN_BUDGET": "999"}, clear=True), patch(
-                "codex_agent.embeddings.OpenAICompatibleEmbeddingProvider") as provider:
+                "dsh_vector_retrieval.embeddings.OpenAICompatibleEmbeddingProvider") as provider:
             build_configured_embedding_provider()
             self.assertEqual(provider.call_args.kwargs["api_key"], "private-value")
             self.assertEqual(provider.call_args.kwargs["model"], "fixture")

@@ -1,0 +1,53 @@
+{
+  "name": "dsh-vector-retrieval",
+  "version": "0.1.0",
+  "description": "Scoped vector retrieval and embedding service for DeepSeek Harness",
+  "type": "module",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./config": "./lib/config.js",
+    "./service": "./lib/service.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "lib",
+    "scripts",
+    "python/pyproject.toml",
+    "python/LICENSE",
+    "python/dsh_vector_retrieval/*.py",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "setup:backend": "node scripts/setup-backend.mjs",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/schemastery": "3.18.2"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "link:../../thirdparty/deepseek-harness/vendor/cordis",
+    "@deepseek-ai/schemastery": "link:../../thirdparty/deepseek-harness/vendor/schemastery",
+    "vitest": "^4.1.8"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "license": "MIT AND Apache-2.0"
+}

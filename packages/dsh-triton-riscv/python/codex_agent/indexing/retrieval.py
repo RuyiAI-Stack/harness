@@ -4,6 +4,7 @@ import json
 import math
 
 from sqlalchemy import and_, select, tuple_
+from dsh_vector_retrieval.validation import MAX_CANDIDATES, MAX_QUERY_TOKENS
 
 from codex_agent.memory_lineage import case_payload, digest, SPLITTER_VERSION
 from codex_agent.runtime_config import runtime_config
@@ -13,10 +14,6 @@ from codex_agent.storage.schema import (
 )
 from .qdrant import Qdrant
 from .worker import provider_for
-
-MAX_CANDIDATES = 200
-MAX_QUERY_TOKENS = 2048
-
 
 class RetrievalUnavailable(RuntimeError):
     pass

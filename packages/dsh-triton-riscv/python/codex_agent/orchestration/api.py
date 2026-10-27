@@ -11,6 +11,7 @@ from .lifecycle import WorkflowLifecycle
 from .models import Contract, TaskRequest
 from .roles import Evidence, OperatorContract
 from .service import WorkflowService
+from .usage_report import workflow_usage
 
 
 class Submission(Contract):
@@ -67,6 +68,10 @@ def router(root):
     @routes.get("/{workflow_id}")
     def get(workflow_id: str):
         return call(lambda: WorkflowLifecycle(root).view(workflow_id))
+
+    @routes.get("/{workflow_id}/usage")
+    def usage(workflow_id: str):
+        return call(lambda: workflow_usage(WorkflowLifecycle(root).jobs.db, workflow_id))
 
     @routes.post("/{workflow_id}/{action}")
     def act(workflow_id: str, action: Literal["publish", "apply", "plan-validation", "enqueue-validation", "collect-validation"],

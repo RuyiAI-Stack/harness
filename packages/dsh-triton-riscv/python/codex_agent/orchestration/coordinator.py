@@ -16,6 +16,7 @@ from .service import WorkflowSeed, contract_from_spec, snapshot_files
 from codex_agent.develop_operator import parse_operator_spec
 from .retrieval import role_evidence
 from .store import WorkflowStore
+from .reuse import preparation_scope, reuse_preparation
 
 
 class ProposalCoordinator:
@@ -101,7 +102,8 @@ class ProposalCoordinator:
         step = task["steps"][-1]
         request = request.model_copy(update={"step_id": step["id"]})
         audit = {"request": request.model_dump(mode="json"), "retrieval": retrieval, "system_prompt": system_prompt(role),
-                 "task_prompt": task_prompt(request)}
+                 "task_prompt": task_prompt(request),
+                 "preparation_scope": preparation_scope(self.root, task, seed, contract, self.agent)}
         self.jobs.begin_effects(self.job["id"], self.owner)
         notifications, event_bytes, omitted = [], 0, 0
         def on_event(event):
@@ -113,7 +115,8 @@ class ProposalCoordinator:
             else:
                 omitted += 1
         try:
-            value = self.agent.run(request, on_event=on_event)
+            value = self.agent.run(request, on_event=on_event,
+                                   on_usage=lambda usage: audit.update(usage=usage))
         except Exception as error:
             # An interrupted request has an unknown outcome; do not auto-repeat it.
             audit.update(outcome="unknown", error_type=type(error).__name__,
@@ -151,6 +154,11 @@ class ProposalCoordinator:
             raise Conflict("unfinished model call requires reconciliation, not automatic replay")
         contract = seed.contract
         files = {f.path: f for f in seed.files}
+        task = reuse_preparation(self.store, task, seed, self.agent)
+        reused = task["result"].get("preparation_reuse", {})
+        if (reused.get("status") == "reused"
+                and reused.get("scope_sha256") != preparation_scope(self.root, task, seed, contract, self.agent)):
+            task = self._stop(task, "Preparation settings changed after reuse; submit a new frozen workflow.")
         # Restore virtual files from durable role artifacts, not a sibling run.
         for step in task["steps"]:
             result = self._load_output(step)
@@ -182,7 +190,9 @@ class ProposalCoordinator:
                 if result.decision in {"ask_user", "blocked"}:
                     task = self._stop(task, " ".join(result.questions) or result.summary)
                     break
-                if result.decision == "request_semantics" or contract is None:
+                # A frozen contract is authoritative. Re-extraction cannot update it
+                # and can turn a harmless wording change into a blocked repair.
+                if contract is None:
                     task, result = self._call(task, "semantic", seed, contract, files)
                     if result is None or result.status != "completed" or result.unknowns:
                         task = self._stop(task, self._blocked_reason(result, "Semantic output rejected."))
@@ -240,6 +250,7 @@ class ProposalCoordinator:
             task = self.store.advance(task["id"], NEXT_STATE[task["state"]], {**task["versions"], **changed},
                 expected_revision=task["revision"], event_id="advance-" + str(task["revision"]))
         return {"workflow_id": task["id"], "workflow_state": task["state"], "revision": task["revision"],
+                "preparation_reuse": task["result"].get("preparation_reuse"),
                 "validation": "not_started", "files_applied": False, "reason": task["result"].get("reason",
                 "Candidate proposal is ready for approval; no code was applied or tested."),
                 "artifact_ids": [s["result"].get("artifact_id") for s in task["steps"]]}

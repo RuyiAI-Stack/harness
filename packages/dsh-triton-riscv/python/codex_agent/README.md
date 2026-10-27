@@ -2,6 +2,10 @@
 
 The `codex_agent` package provides the plugin's MCP tools, operator lifecycle, remote execution, RAG, and optional FastAPI workbench. Harness runs the native agent loop.
 
+Embedding/vector transport and isolated role execution come from the sibling
+`dsh-vector-retrieval` and `dsh-multi-agent` distributions. Operator-specific
+query construction, evidence expansion, role policies and approvals stay here.
+
 For installation and usage, start with the [plugin README](../../README.md). The backend is installed once in the plugin environment, not in each operator checkout.
 
 ## Local Development
@@ -9,7 +13,7 @@ For installation and usage, start with the [plugin README](../../README.md). The
 From `packages/dsh-triton-riscv/` after plugin setup:
 
 ```sh
-.venv/bin/python -m pip install -e './python[workbench]'
+.venv/bin/python -m pip install ../dsh-vector-retrieval/python ../dsh-multi-agent/python -e './python[workbench]'
 .venv/bin/python -m codex_agent.storage upgrade
 npm run test:backend
 ```
@@ -148,7 +152,8 @@ existing lifecycle journals still guard later execution.
 This release uses separate local processes, durable classic queues and local
 content-addressed artifacts. API/workers must share the same host, absolute checkout
 and state path. It is not a multi-host HA deployment: shared object storage, quorum
-queues, authentication, monitoring and retention policies remain deployment work.
+queues, monitoring and retention policies remain deployment work. Multi-user access
+requires the account gateway below, not a publicly exposed single-user API.
 Redis is never the task source of truth. Keep all services private.
 
 With the same disposable service configuration, run just the queue module:
@@ -170,6 +175,34 @@ Repair submissions require `failure_run_id`; repeated requests must reuse `reque
 The Agent Worker plans tests, proposes code and independently reviews it.
 Read `GET /api/operator-workflows/{id}` for state, role steps and artifact IDs.
 
+Review prompts send duplicate candidate source once, with an in-message reference
+from the file snapshot. Original failing source, fixed tests and evidence remain
+intact; stored audit requests keep full bodies. Very short source stays inline.
+
+Automatic repair children reuse the earlier routing and fixed test plan only when
+their reciprocal task lineage, failure receipt, contract, tests, model and local
+configuration still match. Missing or legacy evidence uses the full route. Set
+`request.reuse_preparation: false` to opt out. The usage response records reuse
+separately from model calls; it never invents saved tokens. Implementation, independent
+review, fresh approval and validation still run. Restart Agent Workers after updating.
+This checks configured targets, not unreported changes to the remote environment.
+Even on the full route, a frozen contract is not re-extracted by the semantic role;
+explicit clarification requests still stop the workflow.
+
+Read `GET /api/operator-workflows/{id}/usage` for per-role tokens, elapsed time,
+failed attempts and the linked repair chain. Restart the backend and Agent Workers
+after updating; no schema migration is needed for this accounting feature. New
+role artifacts include usage; older/missing records remain unknown, never zero.
+Cached input is counted separately; reasoning tokens are not added to output twice.
+Figures come from SDK events, not provider invoices. Prices are not configured,
+and embedding, ordinary chat, queue and validation time are outside this report.
+The pinned SDK 0.1.2rc1 uses explicit profiles with private temporary homes;
+upgrade with `pip install -e './python[workbench]'` before restarting workers.
+Session logs stay in their configured directory. Custom Cordis files must use
+current host services, not the removed `dsh-agent-spine-demo` preset.
+SDK totals and positive cache counts are preserved. Omitted breakdowns and
+all-zero usage stay unknown, not free execution. Old records are not recomputed.
+
 Host actions use `POST /api/operator-workflows/{id}/{action}` with
 `{"expected_revision": N}`. The sequence is `publish`, human approval through the
 existing proposal decision endpoint, `apply`, `plan-validation`, human approval
@@ -186,7 +219,7 @@ Failed attempts stay failed and link to separate repair tasks. Source-irreparabl
 failures stop; all new writes/tests still require approval. Roles receive bounded
 stage-specific RAG evidence from the configured retriever; missing RAG is recorded,
 not reported as verified knowledge. Each role's input, retrieval trace and output
-are saved as artifacts. This experimental route has not been live-model calibrated.
+are saved as artifacts. Controlled model/remote pilots are not production success-rate evidence.
 
 ## Async Vector Indexing
 
@@ -289,3 +322,58 @@ budget, including metadata and omission markers. This is **not a model-token bud
 Harness still owns the complete conversation window. Whole selected snippets are kept
 or omitted, and recommendations never become verified repairs. Legacy mode/format is
 unchanged. Activation and switching the workbench remain explicit operator choices.
+
+## Account Gateway
+
+Invite-only access to the existing workbench, on Linux/macOS. Install `[workbench]`,
+build the frontend and back up MySQL before running the explicit schema upgrade.
+Use a **separate private Redis instance**, with a memory limit and `noeviction`;
+authentication outages deny access rather than falling back to anonymous mode.
+
+```sh
+.venv/bin/python -I -m codex_agent.storage upgrade
+.venv/bin/python -I -m codex_agent.accounts template \
+  --source /path/to/operator-checkout --destination /path/to/reviewed-template
+export TRITON_AUTH_REDIS_URL='redis://127.0.0.1:6380/0'
+```
+
+Review the exported tracked sources. No `.git`, old sessions, credentials or reports
+are imported. Put this in a private `accounts.json`, using real absolute paths:
+
+```json
+{
+  "origin": "http://127.0.0.1:8766",
+  "listen_port": 8766,
+  "allow_local_http": true,
+  "template": "/path/to/reviewed-template",
+  "data_dir": "/path/to/private-account-data"
+}
+```
+
+```sh
+.venv/bin/python -I -m codex_agent.accounts --config /path/to/accounts.json invite
+.venv/bin/python -I -m codex_agent.accounts --config /path/to/accounts.json serve
+```
+
+Open the configured origin, register with the single-use invitation, then log in.
+Passwords use Argon2id; opaque HttpOnly cookies expire after 30 minutes of inactivity
+or 12 hours total. Logout, password changes and account disabling revoke access.
+Admin commands are `disable USERNAME` and `enable USERNAME` with the same config.
+
+Tabs in one browser profile share a login. Switching accounts clears the old UI;
+stale requests and replies are rejected. For simultaneous independent logins, use
+separate browser profiles or a private window. Test isolation by creating a session
+as A, logging in as B, then returning to A: each should see only its own sessions.
+
+Each account gets private source, state, cache/index namespaces and private backend
+processes. Existing runtime/model settings are inherited; queue/index workers start
+when configured. Mutations require an isolated remote validator and normal approvals.
+Account agents have domain tools only, not a shared-host shell or general file tools.
+Defaults allow 16 accounts and 4 active workspaces; capacity exhaustion returns 503.
+Run one gateway process per data directory, under a dedicated OS service account.
+
+For team deployment use an HTTPS origin behind a trusted reverse proxy, retain the
+Host header, disable proxy buffering for SSE, and keep backend/services private.
+This is not native Harness SSO or a sandbox for hostile public users. Historical data
+is unchanged and not assigned to new accounts. Public signup, password recovery,
+shared/team libraries and multi-host scaling are not implemented.

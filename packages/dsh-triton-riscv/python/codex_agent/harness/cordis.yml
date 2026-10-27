@@ -1,13 +1,7 @@
-# Triton-RISCV composition for deepseek-harness-sdk 0.1.1rc1.
+# Triton-RISCV domain services for the isolated SDK profile (0.1.2rc1).
 # Keep the SDK JSON-RPC server: the Python client communicates through it.
 - id: sdk-jsonrpc-server
   name: '@deepseek-ai/dsh-sdk-jsonrpc-server'
-
-- id: agent-core
-  name: '@deepseek-ai/dsh-agent-spine-demo'
-  config:
-    workspaceContext:
-      maxBytes: 65536
 
 - id: llm-isrc
   name: '@deepseek-ai/dsh-llm-pi-ai'
@@ -43,6 +37,11 @@
   config:
     cwd: !!js process.env.DSH_CWD ?? process.cwd()
 
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
 # The local demo platform mounts the same domain-policy module distributed by
 # the installable dsh-triton-riscv bundle.
 - id: triton-riscv-domain-policy
@@ -61,7 +60,7 @@
     env: !!js >-
       (() => {
         const c = JSON.parse(process.env.TRITON_RISCV_CONFIG ?? '{}');
-        const keys = ['TRITON_RISCV_CONFIG', 'TRITON_RISCV_STATE_DIR',
+        const keys = ['TRITON_RISCV_CONFIG', 'TRITON_RISCV_STATE_DIR', 'TRITON_WORKBENCH_OWNER',
           'TRITON_RISCV_ALLOW_VALIDATION', 'TRITON_RISCV_ALLOW_REPAIR_APPLY',
           'TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY', 'TRITON_RISCV_REQUIRE_REMOTE',
           'TRITON_RISCV_REQUIRE_APPROVED_VALIDATION', 'RISCV_HOST', 'RISCV_REPO',

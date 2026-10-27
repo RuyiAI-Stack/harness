@@ -28,6 +28,7 @@ class TaskRequest(Contract):
     max_repairs: int = Field(default=3, ge=1, le=20)
     auto_repair: bool = False
     auto_publish: bool = False
+    reuse_preparation: bool = True
 
 
 class StepRequest(Contract):

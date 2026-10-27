@@ -1,0 +1,6 @@
+- insert:
+    - id: multi-agent
+      name: dsh-multi-agent
+      # A trusted host must configure Python, model and task definitions first.
+      config:
+        enabled: false

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncIterator
@@ -32,6 +34,7 @@ from codex_agent.platform.store import PlatformStore
 from codex_agent.runtime_config import runtime_config
 from codex_agent.tasks.service import TaskService
 from codex_agent.tasks.store import Conflict
+from codex_agent.accounts.guard import GATEWAY_ENV, check_workspace, owner_id, reviewer_identity
 
 
 class SessionRequest(BaseModel):
@@ -64,6 +67,7 @@ def create_app(
     harness_agent: HarnessAgent | None = None,
 ) -> FastAPI:
     root = (repo_root or repository_root()).resolve()
+    check_workspace(root)
     frontend_dist = Path(__file__).parents[1] / "frontend" / "dist"
     react_frontend_available = (frontend_dist / "index.html").is_file()
     store = PlatformStore(root)
@@ -90,6 +94,22 @@ def create_app(
     app.state.service = service
     app.state.executor = executor
     app.state.tasks = tasks
+    if owner_id():
+        gateway_key = os.environ.get(GATEWAY_ENV, "")
+        if not gateway_key:
+            raise PermissionError("Account backend must be started by its private gateway")
+
+        @app.middleware("http")
+        async def private_backend(request, call_next):
+            if not secrets.compare_digest(request.headers.get("x-triton-gateway", ""), gateway_key):
+                return JSONResponse({"detail": "Authenticated gateway required"}, status_code=401)
+            try:
+                await asyncio.to_thread(check_workspace, root)
+            except PermissionError:
+                return JSONResponse({"detail": "Account access revoked"}, status_code=403)
+            response = await call_next(request)
+            response.headers["Cache-Control"] = "no-store"
+            return response
     from codex_agent.orchestration.api import router as workflow_router
     app.include_router(workflow_router(root))
     if react_frontend_available:
@@ -127,6 +147,11 @@ def create_app(
     @app.get("/api/bootstrap")
     def bootstrap() -> dict:
         return service.bootstrap()
+
+    @app.get("/api/auth/me")
+    def local_identity():
+        # The public account gateway handles its own endpoint before proxying.
+        return {"enabled": False, "user": None}
 
     @app.get("/api/sessions")
     def sessions() -> list[dict]:
@@ -296,7 +321,7 @@ def create_app(
                 root,
                 proposal_id,
                 approve=request.approve,
-                reviewer=request.reviewer,
+                reviewer=reviewer_identity(request.reviewer),
                 note=request.note,
             )
         except FileNotFoundError as error:
@@ -321,7 +346,7 @@ def create_app(
                 root,
                 run_id,
                 approve=request.approve,
-                reviewer=request.reviewer,
+                reviewer=reviewer_identity(request.reviewer),
                 note=request.note,
             )
         except FileNotFoundError as error:
@@ -346,7 +371,7 @@ def create_app(
                 root,
                 proposal_id,
                 approve=request.approve,
-                reviewer=request.reviewer,
+                reviewer=reviewer_identity(request.reviewer),
                 note=request.note,
             )
         except FileNotFoundError as error:

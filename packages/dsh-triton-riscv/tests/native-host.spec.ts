@@ -42,6 +42,29 @@ const { resolveSessionConfig } = await import(pathToFileURL(join(plugin, 'lib/na
 const { OPERATOR_TOOLS } = await import(pathToFileURL(join(plugin, 'lib/tool-policy.js')).href)
 const cleanups: (() => unknown)[] = []
 
+it('loads the independent multi-agent service without operator tools or implicit execution', async () => {
+  const ctx = new Context()
+  cleanups.push(() => ctx.fiber.dispose())
+  const multiAgent = await import(pathToFileURL(join(plugin, '../dsh-multi-agent/index.js')).href)
+  const fiber = await ctx.plugin(multiAgent, {
+    python,
+    model: { provider: 'fixture', model: 'fixture', apiKeyEnv: 'NOT_A_LIVE_KEY' },
+    tasks: {
+      classify: {
+        systemPrompt: 'Classify a support request.',
+        resultSchema: { type: 'object', properties: { category: { type: 'string' } } },
+      },
+    },
+  })
+  const service = ctx.get('multiAgent')
+  for (const method of ['run', 'status', 'result', 'usage', 'cancel', 'release', 'close']) {
+    expect(typeof service[method]).toBe('function')
+  }
+  expect(() => service.status('not-created')).toThrow('Unknown multiAgent run')
+  await fiber.dispose()
+  expect(ctx.get('multiAgent', false)).toBeUndefined()
+})
+
 it('proposal roles use system policy, hide tools and block tool hallucinations in the real agent loop', async () => {
   const ctx = new Context()
   cleanups.push(() => ctx.fiber.dispose())
@@ -52,13 +75,30 @@ it('proposal roles use system policy, hide tools and block tool hallucinations i
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
-  const rolePlugin = await import(pathToFileURL(join(plugin, 'python/codex_agent/orchestration/role-policy.mjs')).href)
+  const rolePolicyPath = execFileSync(
+    python,
+    [
+      '-I',
+      '-c',
+      'from pathlib import Path; import dsh_multi_agent; print(Path(dsh_multi_agent.__file__).with_name("role-policy.mjs"))',
+    ],
+    { encoding: 'utf8' },
+  ).trim()
+  const rolePlugin = await import(pathToFileURL(rolePolicyPath).href)
   const policy = execFileSync(
     python,
     ['-I', '-c', 'from codex_agent.orchestration.prompts import system_prompt; print(system_prompt("implementer"))'],
     { encoding: 'utf8' },
   ).trim()
-  await ctx.plugin(rolePlugin, { systemPrompt: policy })
+  await ctx.plugin(rolePlugin, {
+    systemPrompt: policy,
+    identity: {
+      variable: 'triton_role_policy',
+      section: 'triton:role',
+      effect: 'triton.role',
+      denial: 'Proposal roles cannot execute tools',
+    },
+  })
   let executed = 0
   for (const name of ['bash', 'edit', 'delegate', 'mcp__triton_riscv__apply_repair']) {
     ctx.tools.register({

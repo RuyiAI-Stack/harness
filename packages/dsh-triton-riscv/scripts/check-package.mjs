@@ -44,7 +44,6 @@ for (const file of [
   'python/codex_agent/orchestration/evidence.py',
   'python/codex_agent/orchestration/retrieval.py',
   'python/codex_agent/orchestration/lifecycle.py',
-  'python/codex_agent/orchestration/role-policy.mjs',
   'python/codex_agent/runtime_config.py',
   'python/codex_agent/execution_guard.py',
   'python/codex_agent/process_control.py',

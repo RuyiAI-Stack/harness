@@ -15,7 +15,7 @@ from codex_agent.harness import HarnessRunResult
 from codex_agent.messaging.broker import Broker
 from codex_agent.messaging.relay import publish_once
 from codex_agent.orchestration.coordinator import ProposalCoordinator
-from codex_agent.orchestration.roles import operator_paths
+from codex_agent.orchestration.roles import operator_paths, sha256
 from codex_agent.orchestration.runtime import RoleAgent
 from codex_agent.orchestration.schema import tasks
 from codex_agent.orchestration.service import WorkflowService
@@ -122,7 +122,9 @@ class WorkflowWorkerTests(unittest.TestCase):
         self.assertFalse(planning["files"])
         self.assertEqual(self.backend.calls[3]["files"][0]["content"], TESTS)
         review = self.backend.calls[4]
-        self.assertEqual({f["content"] for f in review["files"]}, {SOURCE, TESTS})
+        self.assertCountEqual(review["files"], [
+            dict(path=operator_paths("fixture_operator")[1], content=TESTS, sha256=sha256(TESTS)),
+            dict(path=operator_paths("fixture_operator")[0], content_ref="/candidate/content", sha256=sha256(SOURCE))])
         self.assertEqual(review["candidate"]["content"], SOURCE)
         self.assertIsNone(review["candidate"]["base_sha256"])
         self.assertIsNone(review["review_baseline"])

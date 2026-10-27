@@ -5,7 +5,7 @@ import math
 from pathlib import Path
 from uuid import UUID
 
-from codex_agent.embeddings import build_embedding_provider
+from dsh_vector_retrieval.embeddings import build_embedding_provider
 from codex_agent.memory_chunking import ChunkPolicy, case_chunk_parts, embedding_input
 from codex_agent.memory_lineage import chunk_lineage, policy_metadata, digest, SPLITTER_VERSION
 from codex_agent.runtime_config import runtime_config

@@ -131,6 +131,9 @@ class WorkflowLifecycle:
             raise Conflict("review contract does not match the frozen workflow version")
         implementation = outputs.get(("implementer", "implementing"))
         tests = outputs.get(("reviewer", "planning_tests"))
+        if tests is None and task["result"].get("preparation_reuse", {}).get("status") == "reused":
+            from .reuse import load_reused_tests
+            tests = load_reused_tests(self.jobs.db, task, seed)
         if not review or review.verdict != "acceptable" or not implementation or not tests:
             raise Conflict("candidate needs completed implementation, fixed tests and independent review")
         files = {implementation.candidate.path: implementation.candidate.content,

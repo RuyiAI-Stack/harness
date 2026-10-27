@@ -127,8 +127,9 @@ class HarnessIntegrationTests(unittest.TestCase):
 
         self.assertEqual(len(instances), 1)
         self.assertEqual(instances[0].calls, ["first", "second"])
-        self.assertEqual(instances[0].kwargs["session_root"], str(settings.session_root))
-        self.assertEqual(instances[0].kwargs["cordis"], str(settings.cordis_path))
+        self.assertEqual(instances[0].kwargs["env"]["DSH_SESSION_ROOT"], str(settings.session_root))
+        self.assertEqual(instances[0].kwargs["profile"], "triton")
+        self.assertFalse(Path(instances[0].kwargs["dsh_home"]).exists())
         self.assertEqual(instances[0].kwargs["model"], "gpt-6-astra")
         self.assertEqual(instances[0].kwargs["env"]["DSH_MODEL"], "gpt-6-astra")
         self.assertNotIn("temperature", instances[0].kwargs)
@@ -163,8 +164,8 @@ class HarnessIntegrationTests(unittest.TestCase):
         )
         self.assertNotIn("api_key", instances[0].kwargs)
         self.assertNotIn("base_url", instances[0].kwargs)
-        self.assertNotIn("profile", instances[0].kwargs)
-        self.assertNotIn("dsh_home", instances[0].kwargs)
+        self.assertNotIn("cordis", instances[0].kwargs)
+        self.assertNotIn("session_root", instances[0].kwargs)
         self.assertTrue(instances[0].closed)
         self.assertEqual(events[0]["method"], "session.event")
 

@@ -1,4 +1,5 @@
 import type { ProposalReview, ValidationPlanReview } from './types'
+import { authFetch } from './auth'
 
 export interface Workflow {
   id: string
@@ -53,7 +54,7 @@ export interface WorkflowSubmission {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch('/api/operator-workflows' + path, {
+  const response = await authFetch('/api/operator-workflows' + path, {
     ...options,
     headers: { 'Content-Type': 'application/json' },
   })

@@ -379,7 +379,7 @@ class WorkflowTests(unittest.TestCase):
             cfg.attributes["connection"] = conn
             command.upgrade(cfg, "head")
             command.upgrade(cfg, "head")
-            self.assertEqual(conn.execute(text("SELECT version_num FROM alembic_version")).scalar(), "0005_operator_workflows")
+            self.assertEqual(conn.execute(text("SELECT version_num FROM alembic_version")).scalar(), "0006_accounts")
             inspector = inspect(conn)
             for table in (tasks, steps, events):
                 self.assertEqual({c["name"] for c in inspector.get_columns(table.name)}, set(table.c.keys()))

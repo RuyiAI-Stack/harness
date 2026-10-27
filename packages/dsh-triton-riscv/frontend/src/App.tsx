@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { api } from './api'
+import { accountName, accountStreamUrl, authFetch } from './auth'
 import { WorkflowPanel } from './WorkflowPanel'
 import { workflowApi } from './workflow-api'
 import { MessageText, shortDate } from './format'
@@ -99,7 +100,7 @@ function ProposalApproval({
   const proposalId = event.payload.proposal_id
   const proposalType = event.payload.proposal_type
   const [proposal, setProposal] = useState<ProposalReview | null>(null)
-  const [reviewer, setReviewer] = useState('ada-cl25')
+  const [reviewer, setReviewer] = useState(accountName() || 'ada-cl25')
   const [pending, setPending] = useState(false)
   const [continued, setContinued] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -148,7 +149,12 @@ function ProposalApproval({
         <>
           <label>
             审查人
-            <input value={reviewer} maxLength={120} onChange={item => setReviewer(item.target.value)} />
+            <input
+              value={reviewer}
+              readOnly={Boolean(accountName())}
+              maxLength={120}
+              onChange={item => setReviewer(item.target.value)}
+            />
           </label>
           <div className="proposal-actions">
             <button
@@ -201,7 +207,7 @@ function CommandApproval({
 }) {
   const validationRunId = event.payload.validation_run_id
   const [plan, setPlan] = useState<ValidationPlanReview | null>(null)
-  const [reviewer, setReviewer] = useState('ada-cl25')
+  const [reviewer, setReviewer] = useState(accountName() || 'ada-cl25')
   const [pending, setPending] = useState(false)
   const [launched, setLaunched] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -269,7 +275,12 @@ function CommandApproval({
         <>
           <label>
             审查人
-            <input value={reviewer} maxLength={120} onChange={item => setReviewer(item.target.value)} />
+            <input
+              value={reviewer}
+              readOnly={Boolean(accountName())}
+              maxLength={120}
+              onChange={item => setReviewer(item.target.value)}
+            />
           </label>
           <div className="proposal-actions">
             <button
@@ -374,14 +385,18 @@ export default function App() {
 
   const createSession = async () => {
     setError(null)
-    const session = await api.createSession()
-    await refreshSessions()
-    await loadSession(session.id)
+    try {
+      const session = await api.createSession()
+      await refreshSessions()
+      await loadSession(session.id)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '创建会话失败')
+    }
   }
 
   const openStream = (runId: string, sessionId: string, after: number) => {
     closeStream()
-    const stream = new EventSource(`/api/runs/${runId}/events/stream?after=${after}`)
+    const stream = new EventSource(accountStreamUrl(`/api/runs/${runId}/events/stream?after=${after}`))
     eventSource.current = stream
     stream.onmessage = async message => {
       const item = JSON.parse(message.data) as RunEvent
@@ -414,6 +429,11 @@ export default function App() {
     stream.onerror = () => {
       setError('任务状态连接已中断，可以重新打开该会话继续查看结果。')
       closeStream()
+      void authFetch('/api/auth/me')
+        .then(response => {
+          if (response.status === 401) window.dispatchEvent(new Event('triton:signout'))
+        })
+        .catch(() => {})
     }
   }
 
@@ -638,7 +658,11 @@ export default function App() {
               className={`session-button ${session.id === activeSessionId ? 'active' : ''}`}
               key={session.id}
               type="button"
-              onClick={() => void loadSession(session.id)}
+              onClick={() =>
+                void loadSession(session.id).catch(reason =>
+                  setError(reason instanceof Error ? reason.message : '读取会话失败'),
+                )
+              }
               onContextMenu={event => {
                 event.preventDefault()
                 setSessionMenu({

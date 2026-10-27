@@ -1,6 +1,7 @@
 import { Check, GitBranch, RefreshCw, Send, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api } from './api'
+import { accountName } from './auth'
 import { MessageText } from './format'
 import { workflowApi, type Workflow, type WorkflowSubmission } from './workflow-api'
 
@@ -36,7 +37,7 @@ export function WorkflowPanel({ sessionId, enabled }: { sessionId: string; enabl
   const [text, setText] = useState('')
   const [autoRepair, setAutoRepair] = useState(true)
   const [budget, setBudget] = useState(3)
-  const [reviewer, setReviewer] = useState('')
+  const [reviewer, setReviewer] = useState(accountName() || '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const pending = useRef<{ fingerprint: string; body: WorkflowSubmission } | null>(null)
@@ -267,7 +268,7 @@ export function WorkflowPanel({ sessionId, enabled }: { sessionId: string; enabl
                   <>
                     <label>
                       审查人
-                      <input aria-label="审查人" value={reviewer} onChange={event => setReviewer(event.target.value)} />
+                      <input aria-label="审查人" value={reviewer} readOnly={Boolean(accountName())} onChange={event => setReviewer(event.target.value)} />
                     </label>
                     <div className="proposal-actions">
                       <button
@@ -315,7 +316,7 @@ export function WorkflowPanel({ sessionId, enabled }: { sessionId: string; enabl
                   <>
                     <label>
                       审查人
-                      <input aria-label="审查人" value={reviewer} onChange={event => setReviewer(event.target.value)} />
+                      <input aria-label="审查人" value={reviewer} readOnly={Boolean(accountName())} onChange={event => setReviewer(event.target.value)} />
                     </label>
                     <div className="proposal-actions">
                       <button

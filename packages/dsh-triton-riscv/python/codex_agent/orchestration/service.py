@@ -16,7 +16,7 @@ from codex_agent.tasks.store import Conflict, JobStore, digest, encode
 from .models import Contract, InputVersions, TaskRequest, Sha256
 from .roles import Evidence, FileSnapshot, OperatorContract, operator_paths, sha256
 from .store import WorkflowStore, bounded
-from .schema import tasks
+from .schema import tasks, events
 
 
 class WorkflowSeed(Contract):
@@ -65,6 +65,51 @@ class WorkflowService:
 
     def submit(self, request, key, *, evidence=(), contract=None, specification=None, failure_run_id=None,
                connection=None, exclude_source_runs=()):
+        if not runtime_config().queue.enabled or not runtime_config().queue.proposalWorkflows:
+            raise PermissionError("proposal workflow submission is disabled")
+        request = TaskRequest.model_validate(request)
+        evidence, exclude_source_runs = list(evidence), list(exclude_source_runs)
+        # Compare a replay to the frozen submission, not files the task has since created.
+        # Hold the same workspace lock through fresh submission to avoid a check/create race.
+        with (self.jobs.db.transaction() if connection is None else nullcontext(connection)) as conn:
+            self.jobs.db.lock(conn, "task-submit")
+            old = self.jobs.find_key(conn, request_key("operator-workflow", key))
+            if old:
+                payload = json.loads(old["payload_json"])
+                records = self.jobs.db.rows(events, events.c.task_id == payload.get("workflow_id"),
+                    events.c.revision == 1, connection=conn)
+                if payload.get("mode") != "operator-workflow" or not records:
+                    raise Conflict("workflow submission key belongs to another operation")
+                created = json.loads(records[0]["payload_json"])
+                if payload.get("fingerprint") != digest([created["request"], created["context"]]):
+                    raise Conflict("stored workflow submission is inconsistent")
+                spec = NewOperatorSpec.model_validate(specification) if specification is not None else None
+                proposed_contract = OperatorContract.model_validate(contract) if contract is not None else None
+                if spec is not None:
+                    derived = contract_from_spec(spec)
+                    if proposed_contract is not None and proposed_contract != derived:
+                        raise Conflict("contract differs from the structured development specification")
+                    proposed_contract = derived
+                excluded = list(exclude_source_runs)
+                if failure_run_id:
+                    excluded.append(f"operator-lifecycle:{failure_run_id}")
+                supplied = WorkflowSeed.model_validate(dict(evidence=evidence, contract=proposed_contract,
+                    specification=spec, failure_run_id=failure_run_id,
+                    exclude_source_runs=list(dict.fromkeys(excluded)))).model_dump(mode="json")
+                incoming = request.model_dump(mode="json")
+                original = dict(created["request"])
+                versions, observed = incoming.pop("versions"), original.pop("versions")
+                fields = ("evidence", "contract", "specification", "failure_run_id", "exclude_source_runs")
+                if (incoming != original or any(value is not None and value != observed[name]
+                        for name, value in versions.items()) or any(supplied[name] != created["context"].get(name,
+                        [] if name == "exclude_source_runs" else None) for name in fields)):
+                    raise Conflict("workflow submission key reused with different inputs")
+                return self.jobs.public(old)
+            return self._submit(request, key, evidence=evidence, contract=contract, specification=specification,
+                failure_run_id=failure_run_id, connection=conn, exclude_source_runs=exclude_source_runs)
+
+    def _submit(self, request, key, *, evidence=(), contract=None, specification=None, failure_run_id=None,
+                connection=None, exclude_source_runs=()):
         if not runtime_config().queue.enabled or not runtime_config().queue.proposalWorkflows:
             raise PermissionError("proposal workflow submission is disabled")
         request = TaskRequest.model_validate(request)

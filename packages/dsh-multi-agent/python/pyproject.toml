@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dsh-multi-agent"
+version = "0.1.0"
+description = "Isolated typed task runs for DeepSeek Harness"
+requires-python = ">=3.10"
+license = {text = "MIT AND Apache-2.0"}
+dependencies = ["deepseek-harness-sdk==0.1.2rc1", "jsonschema>=4.23,<5"]
+
+[tool.setuptools]
+license-files = ["LICENSE", "LICENSE-APACHE"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dsh_multi_agent*"]
+
+[tool.setuptools.package-data]
+dsh_multi_agent = ["*.mjs"]

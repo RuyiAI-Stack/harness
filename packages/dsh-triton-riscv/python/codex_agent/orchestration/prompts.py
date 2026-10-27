@@ -1,9 +1,9 @@
 """Versioned system instructions, separate from untrusted task/evidence text."""
 import json
 
-from .roles import RESULT_TYPES
+from .roles import RESULT_TYPES, RoleRequest
 
-PROMPT_VERSION = "operator-roles-v7"
+PROMPT_VERSION = "operator-roles-v8"
 COMMON = """You are one proposal-only role inside a Triton-RISCV workflow.
 Return exactly one JSON object matching the supplied schema. No Markdown fences.
 The host owns task IDs, phase transitions, approval and actual execution.
@@ -49,9 +49,11 @@ In reviewing, inspect the supplied candidate against the already fixed tests and
 contract. Check shape/dtype edges, masks, numerical tolerance and weakened tests.
 At reviewing, review_baseline is the ORIGINAL failing source (null for creation).
 candidate.content is the NEW proposal; candidate.base_sha256 identifies the original
-write-base. files contains the NEW source plus fixed tests; versions.source_sha256
-identifies the NEW snapshot. Compare old to new using review_baseline and candidate,
-not candidate versus files (these intentionally contain the same proposed source).
+write-base. files contains fixed tests and NEW source metadata; versions.source_sha256
+identifies the NEW snapshot. A file's content_ref="/candidate/content" refers to
+candidate.content already in this same input, not an external file or tool request.
+Read that text as the file body. Short bodies may remain inline as content.
+Compare old to new using review_baseline and candidate, not candidate versus files.
 Failure evidence describes review_baseline, not execution of the new candidate.
 Do not rewrite acceptance tests during review. An acceptable verdict means only
 review acceptance, not successful compilation, numerical validation or permission.""",
@@ -80,11 +82,21 @@ def system_prompt(role):
 
 def task_prompt(request):
     # Each role receives a fresh projection, never the previous agent conversation.
+    request = RoleRequest.model_validate(request.model_dump())
     data = request.model_dump(mode="json")
     if request.role in {"main", "semantic"} or request.phase == "planning_tests":
         data["files"] = [f for f in data["files"] if f["path"].endswith(f"/test_{request.operator}.py")]
     if request.role == "main":
         data["files"] = []
+    if request.phase == "reviewing" and request.candidate is not None:
+        # Validation above binds the candidate to this exact path, body and digest.
+        # Only the model-facing projection changes; durable evidence stays whole.
+        for index, file in enumerate(data["files"]):
+            if file["path"] == request.candidate.path:
+                reference = {key: value for key, value in file.items() if key != "content"}
+                reference["content_ref"] = "/candidate/content"
+                if len(json.dumps(reference, ensure_ascii=False).encode()) < len(json.dumps(file, ensure_ascii=False).encode()):
+                    data["files"][index] = reference
     text = json.dumps(data, ensure_ascii=False)
     if len(text.encode()) > 65536:
         raise ValueError("role input exceeds 64 KiB; provide a smaller evidence projection without truncating constraints")

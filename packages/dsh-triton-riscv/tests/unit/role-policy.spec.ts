@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
-import { apply } from '../../python/codex_agent/orchestration/role-policy.mjs'
+import { installPolicy } from '../../../dsh-multi-agent/python/dsh_multi_agent/role-policy.mjs'
+
+function apply(ctx: any, config: any) {
+  installPolicy(ctx, config, {
+    variable: 'triton_role_policy',
+    section: 'triton:role',
+    effect: 'triton.role',
+    denial: 'Proposal roles cannot execute tools',
+  })
+}
 
 function host() {
   const hooks = new Map<string, Function>()

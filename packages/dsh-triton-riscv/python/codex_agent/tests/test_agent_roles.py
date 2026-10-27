@@ -329,7 +329,7 @@ class ProposalBackendTests(unittest.TestCase):
                 self.closed = False
                 calls.append(self)
             def run(self, prompt, **kwargs):
-                self.config = json.loads(Path(self.kwargs["cordis"]).read_text())
+                self.config = json.loads((Path(self.kwargs["dsh_home"]) / "profiles/triton/cordis.patch.yml").read_text())
                 self.assertion = list(Path(self.kwargs["cwd"]).iterdir())
                 kwargs["on_notification"](SimpleNamespace(method="session.event", payload={"fixture": True}))
                 return SimpleNamespace(session_id=kwargs["session_id"], final_response="{}", finish_reason="completed", events=[])
