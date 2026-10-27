@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from dataclasses import dataclass
 from typing import Callable, NamedTuple
@@ -13,6 +14,17 @@ class MemoryChunk(NamedTuple):
     position: int
     text: str
     source_field: str
+
+
+class CaseChunk(NamedTuple):
+    kind: str
+    position: int
+    text: str
+    source_field: str
+    unit_position: int = 0
+    unit_sha256: str = ""
+    part_index: int = 0
+    part_count: int = 1
 
 
 @dataclass(frozen=True)
@@ -242,17 +254,18 @@ def case_fields(item: dict) -> list[tuple[str, str, str]]:
     return fields
 
 
-def case_chunks(
+def case_chunk_parts(
     item: dict,
     *,
     token_count: Callable[[str], int] | None = None,
     policy: ChunkPolicy = ChunkPolicy(),
-) -> list[MemoryChunk]:
+) -> list[CaseChunk]:
     operator = str(item.get("operator") or "unknown")
     fields = case_fields(item)
 
-    chunks: list[MemoryChunk] = []
+    chunks: list[CaseChunk] = []
     positions: dict[str, int] = {}
+    unit_positions: dict[str, int] = {}
     for kind, source, content in fields:
         title = chunk_title(operator, kind, source)
         segments = [content]
@@ -267,9 +280,32 @@ def case_chunks(
             if len(segments) > 1 and segments[0].strip():
                 segments[1] = segments[0] + segments[1]
                 segments = segments[1:]
+        units = []
         for segment in segments:
-            for part in split_chunk_text(segment, title=title, token_count=token_count, policy=policy):
+            segment = segment.strip()
+            oversized = len(segment) > policy.max_chars or (
+                token_count is not None and token_count(title + segment) > policy.max_tokens)
+            # Match the existing splitter's paragraph recursion without changing its text.
+            units.extend(_boundaries(segment, 0) if oversized else [segment])
+        for unit in units:
+            unit_position = unit_positions.get(source, 0)
+            unit_positions[source] = unit_position + 1
+            parts = split_chunk_text(unit, title=title, token_count=token_count, policy=policy)
+            unit_hash = hashlib.sha256(unit.strip().encode("utf-8")).hexdigest()
+            for part_index, part in enumerate(parts):
                 position = positions.get(kind, 0)
-                chunks.append(MemoryChunk(kind, position, part, source))
+                chunks.append(CaseChunk(kind, position, part, source, unit_position,
+                                        unit_hash, part_index, len(parts)))
                 positions[kind] = position + 1
     return chunks
+
+
+def case_chunks(
+    item: dict,
+    *,
+    token_count: Callable[[str], int] | None = None,
+    policy: ChunkPolicy = ChunkPolicy(),
+) -> list[MemoryChunk]:
+    """Keep the four-field interface used by existing offline experiments."""
+    return [MemoryChunk(c.kind, c.position, c.text, c.source_field)
+            for c in case_chunk_parts(item, token_count=token_count, policy=policy)]

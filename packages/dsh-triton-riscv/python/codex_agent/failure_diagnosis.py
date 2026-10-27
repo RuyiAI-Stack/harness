@@ -477,7 +477,11 @@ def diagnose_log(
             "recommended_actions": ["Preserve the passing receipt as validation evidence."],
         }
 
-    lines = text.splitlines()
+    # Launcher metadata can mention every compiler even when only a numerical
+    # assertion failed. Blank known informational lines, preserving log offsets.
+    metadata = ("SANDBOX_READONLY=", "SANDBOX_POLICY=", "REMOTE_WORKSPACE=", "REMOTE_SNAPSHOT_BYTES=")
+    lines = ["" if _clean_line(line).startswith(metadata) else line for line in text.splitlines()]
+    diagnostic_text = "\n".join(lines)
     if exit_code == 124:
         evidence = _evidence(lines, (r".*TIMEOUT.*",), max_items=max_evidence)
         return {
@@ -498,7 +502,7 @@ def diagnose_log(
             ],
         }
 
-    rule = next((candidate for candidate in RULES if candidate.matches(text)), None)
+    rule = next((candidate for candidate in RULES if candidate.matches(diagnostic_text)), None)
     if rule is None:
         observed_stage = _event_stage(failed_event or {})
         if observed_stage is not None:

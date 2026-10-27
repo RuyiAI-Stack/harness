@@ -1,0 +1,4 @@
+- insert:
+    - id: vector-retrieval
+      name: dsh-vector-retrieval
+      disabled: true

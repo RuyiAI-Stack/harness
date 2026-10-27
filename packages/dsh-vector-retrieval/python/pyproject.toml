@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dsh-vector-retrieval"
+version = "0.1.0"
+description = "Scoped vector retrieval and embedding transports for Harness"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+dependencies = []
+
+[project.optional-dependencies]
+embedding-client = ["tokenizers>=0.20,<0.23"]
+embedding = ["sentence-transformers>=3", "tokenizers>=0.20"]
+
+[project.scripts]
+dsh-vector-retrieval = "dsh_vector_retrieval.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dsh_vector_retrieval*"]

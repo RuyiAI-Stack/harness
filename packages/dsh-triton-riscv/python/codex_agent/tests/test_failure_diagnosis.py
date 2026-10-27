@@ -76,6 +76,25 @@ class FailureDiagnosisTests(unittest.TestCase):
         self.assertEqual(passed["status"], "passed")
         self.assertEqual(passed["repair_scope"], "none")
 
+    def test_sandbox_compiler_paths_do_not_hide_real_numerical_failure(self) -> None:
+        log = ('SANDBOX_READONLY=["/tools/triton-shared-opt", "/tools/buddy-opt"]\n'
+               'E AssertionError: Tensor-likes are not close!\n'
+               'E Mismatched elements: 17 / 17\n8 failed in 27.89s\n')
+        diagnosis = diagnose_log(log, 1)
+        self.assertEqual(diagnosis["rule_id"], "numerical-mismatch")
+        self.assertEqual(diagnosis["repair_scope"], "operator-source")
+        self.assertEqual(diagnosis["evidence"][0]["line_number"], 3)
+        self.assertNotIn("SANDBOX_READONLY", str(diagnosis["evidence"]))
+
+    def test_metadata_filter_preserves_actual_compiler_and_sandbox_errors(self) -> None:
+        header = 'SANDBOX_READONLY=["/tools/buddy-opt", "/tools/triton-shared-opt"]\n'
+        compiler = diagnose_log(header + 'triton-shared-opt: error: conversion failed\n', 1)
+        self.assertEqual(compiler["rule_id"], "triton-shared-generic")
+        self.assertEqual(compiler["evidence"][0]["line_number"], 2)
+        failure = diagnose_log(header + 'SANDBOX_ERROR=namespace setup failed\n', 1)
+        self.assertNotEqual(failure["rule_id"], "triton-shared-generic")
+        self.assertIn("SANDBOX_ERROR", str(failure["evidence"]))
+
 
 if __name__ == "__main__":
     unittest.main()

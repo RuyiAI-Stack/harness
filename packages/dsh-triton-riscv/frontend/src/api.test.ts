@@ -85,7 +85,11 @@ describe('FastAPI client', () => {
 
     await api.deleteSession('session-1')
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/sessions/session-1', { method: 'DELETE' })
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/sessions/session-1',
+      expect.objectContaining({ method: 'DELETE', credentials: 'same-origin' }),
+    )
+    expect(fetchMock.mock.calls[0][1].headers.get('Content-Type')).toBe('application/json')
   })
 
   it('surfaces FastAPI validation errors', async () => {

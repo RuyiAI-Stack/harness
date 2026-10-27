@@ -2,6 +2,10 @@
 
 The `codex_agent` package provides the plugin's MCP tools, operator lifecycle, remote execution, RAG, and optional FastAPI workbench. Harness runs the native agent loop.
 
+Embedding/vector transport and isolated role execution come from the sibling
+`dsh-vector-retrieval` and `dsh-multi-agent` distributions. Operator-specific
+query construction, evidence expansion, role policies and approvals stay here.
+
 For installation and usage, start with the [plugin README](../../README.md). The backend is installed once in the plugin environment, not in each operator checkout.
 
 ## Local Development
@@ -9,7 +13,7 @@ For installation and usage, start with the [plugin README](../../README.md). The
 From `packages/dsh-triton-riscv/` after plugin setup:
 
 ```sh
-.venv/bin/python -m pip install -e './python[workbench]'
+.venv/bin/python -m pip install ../dsh-vector-retrieval/python ../dsh-multi-agent/python -e './python[workbench]'
 .venv/bin/python -m codex_agent.storage upgrade
 npm run test:backend
 ```
@@ -48,6 +52,26 @@ Evidence files stay in place. Retain them and the original databases for rollbac
 the importer never reclassifies historical results as verified successes.
 `MemoryStore` and `PlatformStore` now take a workspace directory, not a database
 file. The memory CLI uses `--workspace`; development uses `--memory-workspace`.
+
+### Case and Chunk Versions
+
+Schema upgrade `0003_memory_lineage` adds nullable lineage fields without rewriting
+historical content. New writes keep source snapshots in `memory_versions` and bind
+each chunk to its workspace, case version, source unit and part number. These are
+content versions, not Git revisions or proof that a repair passed.
+
+To backfill existing cases, stop writers, back up MySQL, then run:
+
+```sh
+.venv/bin/python -I -m codex_agent.storage upgrade
+.venv/bin/python -I -m codex_agent.memory --workspace /path/to/checkout rebuild-chunks --embedding-provider none
+```
+
+The command above makes no model calls and uses character-bounded chunks; unchanged chunk
+text keeps its vectors, changed layouts clear child vectors for explicit re-indexing.
+Old cases (including SQLite imports) remain readable with unknown lineage until
+rebuilt. Snapshots start at the first write/rebuild; earlier overwritten versions
+cannot be recovered. Retrieval defaults and prompt assembly are unchanged.
 
 ## Redis Options
 
@@ -128,9 +152,228 @@ existing lifecycle journals still guard later execution.
 This release uses separate local processes, durable classic queues and local
 content-addressed artifacts. API/workers must share the same host, absolute checkout
 and state path. It is not a multi-host HA deployment: shared object storage, quorum
-queues, authentication, monitoring and retention policies remain deployment work.
+queues, monitoring and retention policies remain deployment work. Multi-user access
+requires the account gateway below, not a publicly exposed single-user API.
 Redis is never the task source of truth. Keep all services private.
 
 With the same disposable service configuration, run just the queue module:
 `npm run test:backend -- -t test_task_queue.py`.
 The optional private-broker restart test also needs `TRITON_TEST_RABBITMQ_CTL`.
+
+### Experimental Operator Workflows
+
+`queue.proposalWorkflows` defaults to `false` and requires `queue.enabled`.
+Enabling it permits model calls with frozen source, tests and task evidence.
+Normal chat routing is unchanged; roles propose files but cannot use tools.
+
+Select **Multi-agent** in the workbench, enter an operator name and requirements,
+and review the extracted specification and patch before approving. Repairs require
+an audited failure receipt ID. Nothing is written or tested merely by submitting.
+API clients use `POST /api/operator-workflows` with `request`, `request_id` and either
+a structured `specification`, or `request.auto_publish: true` for interactive creation.
+Repair submissions require `failure_run_id`; repeated requests must reuse `request_id`.
+The Agent Worker plans tests, proposes code and independently reviews it.
+Read `GET /api/operator-workflows/{id}` for state, role steps and artifact IDs.
+
+Review prompts send duplicate candidate source once, with an in-message reference
+from the file snapshot. Original failing source, fixed tests and evidence remain
+intact; stored audit requests keep full bodies. Very short source stays inline.
+
+Automatic repair children reuse the earlier routing and fixed test plan only when
+their reciprocal task lineage, failure receipt, contract, tests, model and local
+configuration still match. Missing or legacy evidence uses the full route. Set
+`request.reuse_preparation: false` to opt out. The usage response records reuse
+separately from model calls; it never invents saved tokens. Implementation, independent
+review, fresh approval and validation still run. Restart Agent Workers after updating.
+This checks configured targets, not unreported changes to the remote environment.
+Even on the full route, a frozen contract is not re-extracted by the semantic role;
+explicit clarification requests still stop the workflow.
+
+Read `GET /api/operator-workflows/{id}/usage` for per-role tokens, elapsed time,
+failed attempts and the linked repair chain. Restart the backend and Agent Workers
+after updating; no schema migration is needed for this accounting feature. New
+role artifacts include usage; older/missing records remain unknown, never zero.
+Cached input is counted separately; reasoning tokens are not added to output twice.
+Figures come from SDK events, not provider invoices. Prices are not configured,
+and embedding, ordinary chat, queue and validation time are outside this report.
+The pinned SDK 0.1.2rc1 uses explicit profiles with private temporary homes;
+upgrade with `pip install -e './python[workbench]'` before restarting workers.
+Session logs stay in their configured directory. Custom Cordis files must use
+current host services, not the removed `dsh-agent-spine-demo` preset.
+SDK totals and positive cache counts are preserved. Omitted breakdowns and
+all-zero usage stay unknown, not free execution. Old records are not recomputed.
+
+Host actions use `POST /api/operator-workflows/{id}/{action}` with
+`{"expected_revision": N}`. The sequence is `publish`, human approval through the
+existing proposal decision endpoint, `apply`, `plan-validation`, human approval
+through the existing validation decision endpoint, then `enqueue-validation`.
+No action accepts a caller-selected proposal or result ID. Write/validation
+permissions remain separate; repairing an operator cannot replace its tests.
+
+The Validation Worker collects the result automatically. If collection fails,
+use `collect-validation`; it checks the saved evidence without rerunning tests.
+Only matching receipt, log, source, plan and worker artifact can mark success.
+Interrupted writes require reconciliation, not blind retries. Review rework and
+optional `request.auto_repair` are bounded by `request.max_repairs` (default 3).
+Failed attempts stay failed and link to separate repair tasks. Source-irreparable
+failures stop; all new writes/tests still require approval. Roles receive bounded
+stage-specific RAG evidence from the configured retriever; missing RAG is recorded,
+not reported as verified knowledge. Each role's input, retrieval trace and output
+are saved as artifacts. Controlled model/remote pilots are not production success-rate evidence.
+
+## Async Vector Indexing
+
+Indexing is off by default and independent of `queue.enabled`. Configure `indexing`
+in the same plugin/runtime document, with `enabled`, `generation`, `dimensions`,
+`modelRevision` and a separate `embedding` definition. For example, an installed
+local model can use `embedding: {provider: "ollama", model: "YOUR_MODEL", tokenBudget: 180}`.
+Use its actual dimension and an immutable model revision, not this placeholder.
+Hosted embeddings additionally require the matching `tokenizerJson` and `tokenBudget`.
+Install `[embedding-client]` in the backend environment for endpoint token counting;
+the model server's tokenizer installation is not shared with MCP or workers.
+
+Run Qdrant privately (`qdrantUrl` defaults to `http://127.0.0.1:6333`); its optional
+key comes from `TRITON_QDRANT_API_KEY`. Run the schema upgrade before enabling indexing.
+Start `relay`, `recover` and the new `index` worker in separate terminals:
+
+```sh
+.venv/bin/python -I -m codex_agent.indexing prepare --workspace /path/to/checkout
+.venv/bin/python -I -m codex_agent.workers index --workspace /path/to/checkout
+```
+
+New/changed memories commit an indexing job and Outbox event with the source data.
+Unchanged writes do not enqueue again. For existing data and failed jobs:
+
+```sh
+.venv/bin/python -I -m codex_agent.indexing backfill --workspace /path/to/checkout
+.venv/bin/python -I -m codex_agent.indexing status --workspace /path/to/checkout
+.venv/bin/python -I -m codex_agent.indexing backfill --workspace /path/to/checkout --retry-failed
+```
+
+For large histories, enqueue at most 100 sources per call instead:
+
+```sh
+.venv/bin/python -I -m codex_agent.indexing backfill-batch --workspace /path/to/checkout --batch-size 25
+# Resume with the returned next_cursor JSON; repeat until done is true.
+.venv/bin/python -I -m codex_agent.indexing backfill-batch --workspace /path/to/checkout --batch-size 25 --cursor 'NEXT_CURSOR_JSON'
+```
+
+Batch cursors target the configured generation and freeze ID upper bounds, not
+source contents. Each page uses current versions; new writes still index incrementally.
+Replaying a page is safe. `done` means enqueue finished, not vectors ready; check
+`status` before activation. Keep the same workspace, generation and retry policy.
+
+Model, tokenizer or chunk-policy changes require a new `generation`; old collections
+and source snapshots remain. `activate --generation NAME` checks every current active
+case before changing the index ledger's active pointer. **It does not enable vector
+retrieval**: existing ranking, context assembly and retrieval defaults stay unchanged.
+After activating/configuring a replacement, `retire --generation OLD` stops updates
+to the old generation without deleting its collection. Staging generations receive
+updates until retired. A model revision label must identify a pinned deployment;
+the label alone cannot prove that a remote provider has not changed its model.
+Archive schedules vector removal. After direct SQL deletions, run `backfill`; run
+`cleanup --generation NAME` to remove obsolete points after interrupted stale writes.
+Neither command deletes source snapshots or indexed text. Check readiness in MySQL,
+not only Qdrant point counts; physical deletion is eventually consistent.
+
+Tests: set `TRITON_TEST_QDRANT_URL` to a disposable Qdrant server in addition to the
+three test services, then run `npm run test:backend -- -t test_memory_indexing.py`.
+Vectors in these tests are synthetic; passing tests do not establish retrieval quality.
+
+### Vector Retrieval (Opt-in)
+
+After backfill and activation, set `memory.retrievalMode: qdrant` in the plugin
+configuration. Default `legacy` is unchanged. Queries use the active index's
+embedding model, not `memory.embedding`. Local Sentence Transformers load
+`modelRevision`; remote deployments must independently guarantee model stability.
+Install the backend's optional `[embedding]` dependencies for local inference.
+
+Preview a staging generation without changing the active index or product mode:
+
+```sh
+.venv/bin/python -I -m codex_agent.indexing query --workspace /path/to/checkout \
+  --generation NAME --query 'Which historical cases explain this lowering error?' --limit 3
+```
+
+Qdrant returns candidate IDs, not all vectors. MySQL checks workspace, current
+case version, ready state and chunk checksum before returning evidence. Top-K is
+distinct cases (1-50), recalled from at most 200 chunks. The trace reports rejected
+or excluded hits and candidate-budget exhaustion; fewer results are not proof that
+no relevant case exists. Queries over 2,048 model tokens are rejected, not truncated.
+Missing/unready indexes and service errors do not silently fall back to legacy.
+Vector reads bypass Redis until index-version-aware caching is implemented.
+
+### Three-Layer Evidence Context
+
+With `qdrant` selected, MCP and native automatic retrieval expand each matched case:
+
+1. Recorded semantics, reference and environment, bound to the current case version.
+2. Stage-specific evidence: contracts/results for generation; errors for diagnosis;
+   actions, patches, results and separately labelled recommendations for repair.
+3. At most one preceding and following part of the same source unit. Missing lineage
+   is not guessed; a neighbor is a labelled fragment, not a reconstructed whole file.
+
+The host selects `task_stage` from lifecycle tools. MCP callers can explicitly use
+`lookup`, `generation`, `diagnosis`, `repair` or `validation`; this never changes ranking
+or grants execution permission. CLI preview also accepts `--task-stage repair`.
+
+Expanded evidence uses source-bound JSON within the existing 6,000 Unicode-character
+budget, including metadata and omission markers. This is **not a model-token budget**;
+Harness still owns the complete conversation window. Whole selected snippets are kept
+or omitted, and recommendations never become verified repairs. Legacy mode/format is
+unchanged. Activation and switching the workbench remain explicit operator choices.
+
+## Account Gateway
+
+Invite-only access to the existing workbench, on Linux/macOS. Install `[workbench]`,
+build the frontend and back up MySQL before running the explicit schema upgrade.
+Use a **separate private Redis instance**, with a memory limit and `noeviction`;
+authentication outages deny access rather than falling back to anonymous mode.
+
+```sh
+.venv/bin/python -I -m codex_agent.storage upgrade
+.venv/bin/python -I -m codex_agent.accounts template \
+  --source /path/to/operator-checkout --destination /path/to/reviewed-template
+export TRITON_AUTH_REDIS_URL='redis://127.0.0.1:6380/0'
+```
+
+Review the exported tracked sources. No `.git`, old sessions, credentials or reports
+are imported. Put this in a private `accounts.json`, using real absolute paths:
+
+```json
+{
+  "origin": "http://127.0.0.1:8766",
+  "listen_port": 8766,
+  "allow_local_http": true,
+  "template": "/path/to/reviewed-template",
+  "data_dir": "/path/to/private-account-data"
+}
+```
+
+```sh
+.venv/bin/python -I -m codex_agent.accounts --config /path/to/accounts.json invite
+.venv/bin/python -I -m codex_agent.accounts --config /path/to/accounts.json serve
+```
+
+Open the configured origin, register with the single-use invitation, then log in.
+Passwords use Argon2id; opaque HttpOnly cookies expire after 30 minutes of inactivity
+or 12 hours total. Logout, password changes and account disabling revoke access.
+Admin commands are `disable USERNAME` and `enable USERNAME` with the same config.
+
+Tabs in one browser profile share a login. Switching accounts clears the old UI;
+stale requests and replies are rejected. For simultaneous independent logins, use
+separate browser profiles or a private window. Test isolation by creating a session
+as A, logging in as B, then returning to A: each should see only its own sessions.
+
+Each account gets private source, state, cache/index namespaces and private backend
+processes. Existing runtime/model settings are inherited; queue/index workers start
+when configured. Mutations require an isolated remote validator and normal approvals.
+Account agents have domain tools only, not a shared-host shell or general file tools.
+Defaults allow 16 accounts and 4 active workspaces; capacity exhaustion returns 503.
+Run one gateway process per data directory, under a dedicated OS service account.
+
+For team deployment use an HTTPS origin behind a trusted reverse proxy, retain the
+Host header, disable proxy buffering for SSE, and keep backend/services private.
+This is not native Harness SSO or a sandbox for hostile public users. Historical data
+is unchanged and not assigned to new accounts. Public signup, password recovery,
+shared/team libraries and multi-host scaling are not implemented.

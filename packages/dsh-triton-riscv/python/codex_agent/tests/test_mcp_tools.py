@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,6 +20,30 @@ FIXTURE_REPOSITORY = Path(__file__).parent / "fixtures/repository"
 
 
 class OperatorToolTests(unittest.TestCase):
+    def test_qdrant_process_exposes_only_supported_candidate_strategy(self):
+        code = """
+import asyncio, json
+from mcp import Client
+from codex_agent.harness.mcp_server import server
+async def main():
+    async with Client(server) as client:
+        listed = await client.list_tools()
+        tool = next(t for t in listed.tools if t.name == 'retrieve_operator_memory')
+        print(json.dumps(tool.input_schema['properties']['candidate_strategy']))
+asyncio.run(main())
+"""
+        env = dict(os.environ, TRITON_RISCV_CONFIG=json.dumps({
+            "schemaVersion": 1, "memory": {"retrievalMode": "qdrant"},
+            "repoRoot": str(FIXTURE_REPOSITORY.resolve()),
+            "stateDir": str((FIXTURE_REPOSITORY / "agent-results").resolve()),
+        }))
+        result = subprocess.run([sys.executable, "-I", "-c", code], env=env,
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        schema = json.loads(result.stdout)
+        self.assertEqual(schema["const"], "record-top5")
+        self.assertEqual(schema["default"], "record-top5")
+
     def test_discovers_existing_operator_evidence(self) -> None:
         result = discover_operator_evidence(FIXTURE_REPOSITORY, "relu_and_mul")
 
@@ -49,6 +76,41 @@ class OperatorToolTests(unittest.TestCase):
 
 
 class McpOperatorToolTests(unittest.IsolatedAsyncioTestCase):
+    async def test_memory_missing_receipt_returns_actionable_error_without_retrieval(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with patch.dict(os.environ, {"TRITON_RISCV_REPO_ROOT": temporary}), patch(
+                "codex_agent.memory_api.retrieve_memories"
+            ) as retrieve, patch("codex_agent.memory_api.discover_operator_evidence") as discover:
+                async with Client(server) as client:
+                    for run_id in ("31f5918357224b388c3cefe187d22a5b", "run-missing"):
+                        with self.subTest(run_id=run_id):
+                            result = await client.call_tool("retrieve_operator_memory", {
+                                "operator_name": "softsign", "run_id": run_id,
+                            })
+                            self.assertFalse(result.is_error)
+                            self.assertEqual(result.structured_content["status"], "unavailable")
+                            self.assertEqual(result.structured_content["items"], [])
+                            self.assertEqual(result.structured_content["retrieval_trace"]["error"],
+                                             "validation-receipt-not-found")
+                            self.assertIn("omit run_id", result.structured_content["warning"])
+                retrieve.assert_not_called()
+                discover.assert_not_called()
+
+    async def test_memory_general_search_does_not_require_a_receipt(self):
+        with patch.dict(os.environ, {"TRITON_RISCV_REPO_ROOT": str(FIXTURE_REPOSITORY)}), patch(
+            "codex_agent.memory_api.retrieve_memories",
+            return_value={"status": "empty", "database": "test", "query": {}, "items": []},
+        ) as retrieve:
+            async with Client(server) as client:
+                result = await client.call_tool("retrieve_operator_memory", {
+                    "operator_name": "relu_and_mul", "semantics": "boundary mask", "task_stage": "diagnosis",
+                })
+        self.assertFalse(result.is_error)
+        self.assertEqual(result.structured_content["status"], "empty")
+        self.assertEqual(retrieve.call_args.kwargs["operator_name"], "relu_and_mul")
+        self.assertEqual(retrieve.call_args.kwargs["exclude_source_runs"], ())
+        self.assertEqual(retrieve.call_args.kwargs["candidate_strategy"], "record-top5")
+
     async def test_mcp_lists_lifecycle_and_calls_discover_operator(self) -> None:
         with patch.dict(
             os.environ,

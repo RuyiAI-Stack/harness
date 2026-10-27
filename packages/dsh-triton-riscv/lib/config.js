@@ -26,12 +26,47 @@ function absolute(value, fallback, label) {
 
 export const CONFIG_ENV = 'TRITON_RISCV_CONFIG'
 
+function indexSettings(input, reserved) {
+  const defaults = { enabled: false, generation: 'v1', embedding: {}, modelRevision: '', dimensions: 384,
+    qdrantUrl: 'http://127.0.0.1:6333', apiKeyEnv: 'TRITON_QDRANT_API_KEY', maxTokens: 180,
+    overlapTokens: 24, batchSize: 32, timeoutSeconds: 30 }
+  const i = { ...defaults, ...object(input, Object.keys(defaults), 'indexing') }
+  const e = object(i.embedding, ['provider', 'model', 'baseUrl', 'tokenizerJson', 'tokenBudget', 'apiKeyEnv'], 'indexing.embedding')
+  i.enabled = boolean(i.enabled, false, 'indexing.enabled')
+  for (const k of ['generation', 'modelRevision', 'qdrantUrl', 'apiKeyEnv']) i[k] = text(i[k], defaults[k], 'indexing.' + k)
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(i.generation)) throw new Error('Invalid indexing.generation')
+  for (const [k, [min, max]] of Object.entries({ dimensions: [1, 65536], maxTokens: [32, 8192], overlapTokens: [0, 1024], batchSize: [1, 128], timeoutSeconds: [1, 120] }))
+    if (!Number.isInteger(i[k]) || i[k] < min || i[k] > max) throw new Error('Invalid indexing.' + k)
+  if (i.overlapTokens >= i.maxTokens) throw new Error('Index overlap must be smaller than chunk budget')
+  const url = new URL(i.qdrantUrl)
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash)
+    throw new Error('Invalid indexing.qdrantUrl; use apiKeyEnv for credentials')
+  i.embedding = {
+    provider: text(e.provider, 'none', 'indexing.embedding.provider'), model: text(e.model, '', 'indexing.embedding.model'),
+    baseUrl: text(e.baseUrl, '', 'indexing.embedding.baseUrl'), tokenizerJson: absolute(e.tokenizerJson, '', 'indexing.embedding.tokenizerJson'),
+    tokenBudget: e.tokenBudget ?? null, apiKeyEnv: text(e.apiKeyEnv, 'AGENT_EMBEDDING_API_KEY', 'indexing.embedding.apiKeyEnv'),
+  }
+  if (i.embedding.tokenBudget !== null && (!Number.isInteger(i.embedding.tokenBudget) || i.embedding.tokenBudget <= 0))
+    throw new Error('Invalid indexing.embedding.tokenBudget')
+  if (i.embedding.baseUrl) {
+    const url = new URL(i.embedding.baseUrl)
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash)
+      throw new Error('Invalid indexing.embedding.baseUrl; use apiKeyEnv for credentials')
+  }
+  for (const key of [i.apiKeyEnv, i.embedding.apiKeyEnv])
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || /^(TRITON_RISCV_|RISCV_)/.test(key) || [...reserved, 'PATH', 'HOME', 'PYTHONPATH', 'PYTHONHOME'].includes(key))
+      throw new Error('Invalid indexing credential variable')
+  if (i.enabled && (!['sentence-transformers', 'openai-compatible', 'ollama'].includes(i.embedding.provider) || !i.embedding.model || !i.modelRevision))
+    throw new Error('Indexing requires an explicit embedding model and revision')
+  return i
+}
+
 // Native JS and Python share one versioned document, not individual settings in env.
 // Plugin code never changes process.env or inherits ambient capability switches.
 export function resolveConfig(input = {}) {
   const c = object(
     input,
-    ['enabled', 'repoRoot', 'python', 'stateDir', 'permissions', 'remote', 'memory', 'storage', 'cache', 'queue'],
+    ['enabled', 'repoRoot', 'python', 'stateDir', 'permissions', 'remote', 'memory', 'storage', 'cache', 'queue', 'indexing'],
     'triton-riscv config',
   )
   const p = object(c.permissions, ['validation', 'development', 'repair'], 'permissions')
@@ -102,6 +137,7 @@ export function resolveConfig(input = {}) {
   }
   const queueDefaults = {
     enabled: false,
+    proposalWorkflows: false,
     urlEnv: 'TRITON_AMQP_URL',
     leaseSeconds: 60,
     maxAttempts: 3,
@@ -110,6 +146,7 @@ export function resolveConfig(input = {}) {
   }
   const queue = { ...queueDefaults, ...object(c.queue, Object.keys(queueDefaults), 'queue') }
   queue.enabled = boolean(queue.enabled, false, 'queue.enabled')
+  queue.proposalWorkflows = boolean(queue.proposalWorkflows, false, 'queue.proposalWorkflows')
   queue.urlEnv = text(queue.urlEnv, 'TRITON_AMQP_URL', 'queue.urlEnv')
   if (
     !/^[A-Za-z_][A-Za-z0-9_]*$/.test(queue.urlEnv) ||
@@ -172,6 +209,7 @@ export function resolveConfig(input = {}) {
     storage,
     cache,
     queue,
+    indexing: indexSettings(c.indexing, [storage.urlEnv, cache.urlEnv, queue.urlEnv]),
     permissions: {
       validation: boolean(p.validation, false, 'permissions.validation'),
       development: boolean(p.development, false, 'permissions.development'),
@@ -204,7 +242,10 @@ export function workerEnvironment(config, ambient = process.env) {
   const cacheKey = config.cache.urlEnv
   if (config.cache.enabled && ambient[cacheKey]) env[cacheKey] = ambient[cacheKey]
   const queueKey = config.queue.urlEnv
-  if (config.queue.enabled && ambient[queueKey]) env[queueKey] = ambient[queueKey]
+  if ((config.queue.enabled || config.indexing.enabled) && ambient[queueKey]) env[queueKey] = ambient[queueKey]
+  if (config.indexing.enabled)
+    for (const key of [config.indexing.apiKeyEnv, config.indexing.embedding.apiKeyEnv])
+      if (ambient[key]) env[key] = ambient[key]
   return env
 }
 export function bridgeEnvironment(config, ambient = process.env) {
@@ -229,6 +270,17 @@ export function mcpConfiguration(config, ambient = process.env) {
 }
 // Compatibility is confined to the optional standalone launcher, not apply().
 export function configFromEnvironment(env) {
+  if (env[CONFIG_ENV]) {
+    try {
+      const raw = env[CONFIG_ENV]
+      if (Buffer.byteLength(raw) > 65536) throw new Error('size')
+      const { schemaVersion, ...settings } = JSON.parse(raw)
+      if (schemaVersion !== 1) throw new Error('version')
+      return resolveConfig({ ...settings, enabled: true, python: env.TRITON_RISCV_MCP_PYTHON })
+    } catch {
+      throw new Error('Invalid TRITON_RISCV_CONFIG; check the versioned plugin configuration')
+    }
+  }
   const quota = (env.TRITON_RISCV_REQUIRE_TASK_QUOTAS ?? '0').trim().toLowerCase()
   if (!['', '0', 'false', '1', 'true'].includes(quota))
     throw new Error('TRITON_RISCV_REQUIRE_TASK_QUOTAS must be 0 or 1')

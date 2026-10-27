@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import threading
+from pathlib import Path
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional, Protocol
 
 from codex_agent.harness.config import HarnessSettings
 from codex_agent.harness.context import build_task_prompt
+from codex_agent.harness.sdk_profile import kernel, stage_composition, write_profile
 
 
 class HarnessUnavailableError(RuntimeError):
@@ -45,6 +48,7 @@ class DeepSeekHarnessBackend:
     def __init__(self, settings: HarnessSettings) -> None:
         self.settings = settings
         self._harness: Any = None
+        self._home = None
         self._lock = threading.RLock()
 
     def _runtime(self) -> Any:
@@ -64,6 +68,8 @@ class DeepSeekHarnessBackend:
             "TRITON_RISCV_WORKBENCH_AUTOSTART": "0",
             "DSH_API_KEY_ENV": self.settings.api_key_env,
             "DSH_MODEL": self.settings.model,
+            "DSH_CWD": str(self.settings.repo_root),
+            "DSH_SESSION_ROOT": str(self.settings.session_root),
             "TRITON_RISCV_MCP_PYTHON": self.settings.mcp_python,
             "TRITON_RISCV_ALLOW_VALIDATION": os.environ.get(
                 "TRITON_RISCV_ALLOW_VALIDATION", "0"
@@ -83,7 +89,15 @@ class DeepSeekHarnessBackend:
         }
         from codex_agent.runtime_config import CONFIG_ENV, runtime_config
         config = runtime_config()
-        for key in (CONFIG_ENV, config.storage.urlEnv, config.cache.urlEnv, config.queue.urlEnv):
+        credential_keys = [config.storage.urlEnv, config.cache.urlEnv, config.queue.urlEnv,
+                           config.memory.embedding.apiKeyEnv]
+        from codex_agent.accounts.guard import OWNER_ENV, check_workspace
+        check_workspace(self.settings.repo_root)
+        if os.environ.get(OWNER_ENV):
+            runtime_env[OWNER_ENV] = os.environ[OWNER_ENV]
+        if config.indexing.enabled:
+            credential_keys.extend([config.indexing.apiKeyEnv, config.indexing.embedding.apiKeyEnv])
+        for key in (CONFIG_ENV, *credential_keys):
             if os.environ.get(key):
                 runtime_env[key] = os.environ[key]
         for name, value in os.environ.items():
@@ -100,15 +114,22 @@ class DeepSeekHarnessBackend:
         if self.settings.base_url:
             runtime_env["ISRC_BASE_URL"] = self.settings.base_url
 
-        self._harness = DeepSeekHarness(
-            provider=self.settings.provider,
-            model=self.settings.model,
-            cwd=str(self.settings.repo_root),
-            session_root=str(self.settings.session_root),
-            cordis=str(self.settings.cordis_path),
-            env=runtime_env,
-            request_timeout_seconds=self.settings.request_timeout_seconds,
-        )
+        self._home = tempfile.TemporaryDirectory(prefix="triton-chat-sdk-")
+        try:
+            profile = write_profile(Path(self._home.name), kernel() + [{
+                "id": "triton-composition", "name": "cordis:include",
+                "config": {"path": (Path(self._home.name) / "profiles/triton/domain.yml").as_uri()},
+            }])
+            stage_composition(self.settings.cordis_path, self._home.name)
+            self._harness = DeepSeekHarness(
+                provider=self.settings.provider, model=self.settings.model,
+                cwd=str(self.settings.repo_root), **profile, env=runtime_env,
+                request_timeout_seconds=self.settings.request_timeout_seconds,
+            )
+        except Exception:
+            self._home.cleanup()
+            self._home = None
+            raise
         return self._harness
 
     def run(
@@ -152,8 +173,13 @@ class DeepSeekHarnessBackend:
     def close(self) -> None:
         with self._lock:
             if self._harness is not None:
-                self._harness.close()
-                self._harness = None
+                try:
+                    self._harness.close()
+                finally:
+                    self._harness = None
+                    if self._home is not None:
+                        self._home.cleanup()
+                        self._home = None
 
 
 class HarnessAgent:

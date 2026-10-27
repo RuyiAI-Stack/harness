@@ -222,8 +222,15 @@ class RedisCacheTests(unittest.TestCase):
 
     def test_request_rate_is_shared_between_store_instances(self):
         self.reconfigure(requestsPerSecond=1)
-        # Freeze Redis's one-second bucket by starting near the beginning of a second.
-        while self.client.time()[1] > 100000:
+        # Start a fresh bucket; earlier tests can consume the shared global quota.
+        previous_second = self.client.time()[0]
+        deadline = time.monotonic() + 5
+        while True:
+            second, microseconds = self.client.time()
+            if second > previous_second and microseconds <= 100000:
+                break
+            if time.monotonic() >= deadline:
+                self.fail("Could not enter a fresh Redis rate-limit window")
             time.sleep(0.01)
         self.store.get(999)
         with self.assertRaises(CacheBusy):

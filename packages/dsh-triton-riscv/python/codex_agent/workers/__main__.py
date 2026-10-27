@@ -15,8 +15,11 @@ from .consumer import execute_delivery
 async def serve(args):
     root = args.workspace.resolve()
     config = runtime_config()
-    if not config.queue.enabled or (config.repoRoot and Path(config.repoRoot).resolve() != root):
-        raise ValueError("enable queue and select the configured workspace")
+    enabled = config.indexing.enabled if args.role == "index" else config.queue.enabled
+    if args.role in {"relay", "recover", "execute", "reconcile"}:
+        enabled = config.queue.enabled or config.indexing.enabled
+    if not enabled or (config.repoRoot and Path(config.repoRoot).resolve() != root):
+        raise ValueError("enable the selected worker and select the configured workspace")
     jobs = JobStore(root)
     if args.role == 'reconcile':
         if not args.confirm_no_active_execution or not args.job or not args.note:
@@ -61,7 +64,7 @@ async def serve(args):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('role', choices=['relay', 'recover', 'agent', 'validation', 'memory', 'execute', 'reconcile'])
+    parser.add_argument('role', choices=['relay', 'recover', 'agent', 'validation', 'memory', 'index', 'execute', 'reconcile'])
     parser.add_argument('--workspace', type=Path, required=True)
     parser.add_argument('--once', action='store_true')
     parser.add_argument('--job')

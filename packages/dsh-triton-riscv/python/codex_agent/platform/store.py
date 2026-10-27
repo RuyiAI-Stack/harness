@@ -17,9 +17,10 @@ def timestamp() -> str:
 
 
 class PlatformStore:
-    def __init__(self, workspace: Path) -> None:
-        self.db = WorkspaceDatabase(workspace)
-        self.db.register()
+    def __init__(self, workspace: Path, *, database=None) -> None:
+        self.db = database or WorkspaceDatabase(workspace)
+        if database is None:
+            self.db.register()
 
     @staticmethod
     def _row(row):

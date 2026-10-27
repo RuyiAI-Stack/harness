@@ -8,10 +8,11 @@ version = "0.1.0"
 description = "Triton-RISCV domain tools, evidence memory and workbench for DeepSeek Harness"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
-dependencies = ["pydantic>=2.11,<3", "mcp==2.1.1", "fastapi>=0.115", "httpx>=0.28", "uvicorn>=0.34", "pytest>=8,<10", "SQLAlchemy>=2.0,<2.1", "PyMySQL[rsa]>=1.1,<2", "alembic>=1.13,<2", "redis>=5,<7", "aio-pika>=9.5,<10"]
+dependencies = ["dsh-vector-retrieval==0.1.0", "dsh-multi-agent==0.1.0", "pydantic>=2.11,<3", "mcp==2.1.1", "fastapi>=0.115", "httpx>=0.28", "uvicorn>=0.34", "pytest>=8,<10", "SQLAlchemy>=2.0,<2.1", "PyMySQL[rsa]>=1.1,<2", "alembic>=1.13,<2", "redis>=5,<7", "aio-pika>=9.5,<10", "argon2-cffi>=23.1,<26"]
 
 [project.optional-dependencies]
-workbench = ["deepseek-harness-sdk==0.1.1rc1", "openai>=2,<3"]
+workbench = ["deepseek-harness-sdk==0.1.2rc1", "openai>=2,<3", "PyYAML>=6,<7"]
+embedding-client = ["tokenizers>=0.20,<0.23"]
 embedding = ["sentence-transformers>=3", "tokenizers>=0.20", "openai>=2,<3"]
 
 [project.scripts]
@@ -29,4 +30,4 @@ testpaths = ["codex_agent/tests"]
 norecursedirs = ["fixtures"]
 
 [tool.setuptools.package-data]
-codex_agent = ["*.json", "README.md", "specs/*.json", "tests/fixtures/*.json", "tests/fixtures/*.sql", "harness/*.yml", "harness/bundle/*", "harness/bundle/lib/*.js", "harness/bundle/prompts/*.md", "frontend/dist/*", "frontend/dist/assets/*", "storage/migrations/*.py", "storage/migrations/versions/*.py"]
+codex_agent = ["*.json", "README.md", "specs/*.json", "tests/fixtures/*.json", "tests/fixtures/*.sql", "harness/*.yml", "harness/bundle/*", "harness/bundle/lib/*.js", "harness/bundle/prompts/*.md", "orchestration/*.mjs", "frontend/dist/*", "frontend/dist/assets/*", "storage/migrations/*.py", "storage/migrations/versions/*.py"]

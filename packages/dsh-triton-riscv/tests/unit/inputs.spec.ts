@@ -11,8 +11,40 @@ import { apply } from '../../native.js'
 import { apply as policy } from '../../index.js'
 
 describe('inputs: configuration and activation boundaries', () => {
+  it('index configuration keeps async indexing independent from the agent queue', () => {
+    expect(resolveConfig().indexing.enabled).toBe(false)
+    const cfg = resolveConfig({
+      repoRoot: '/tmp/op',
+      indexing: {
+        enabled: true,
+        modelRevision: 'fixture-1',
+        embedding: { provider: 'ollama', model: 'fixture' },
+        apiKeyEnv: 'VECTOR_SECRET',
+      },
+    })
+    expect(cfg.queue.enabled).toBe(false)
+    expect(cfg.memory.embedding.provider).toBe('none')
+    const env = workerEnvironment(cfg, { TRITON_AMQP_URL: 'amqp://fixture', VECTOR_SECRET: 'secret-fixture' })
+    expect(env.TRITON_AMQP_URL).toBe('amqp://fixture')
+    expect(env.VECTOR_SECRET).toBe('secret-fixture')
+    expect(env[CONFIG_ENV]).not.toContain('secret-fixture')
+  })
+  it('index configuration rejects ambiguous model identity, dimensions and secrets', () => {
+    for (const indexing of [
+      { enabled: true },
+      { dimensions: 0 },
+      { overlapTokens: 180 },
+      { generation: '../bad' },
+      { apiKeyEnv: 'TRITON_MYSQL_URL' },
+      { qdrantUrl: 'http://user:password@host' },
+    ])
+      expect(() => resolveConfig({ indexing })).toThrow()
+  })
   it('keeps queue optional, typed and credentials outside settings', () => {
     expect(resolveConfig().queue.enabled).toBe(false)
+    expect(resolveConfig().queue.proposalWorkflows).toBe(false)
+    expect(resolveConfig({ queue: { proposalWorkflows: true } }).queue.proposalWorkflows).toBe(true)
+    expect(() => resolveConfig({ queue: { proposalWorkflows: 'true' } })).toThrow()
     for (const queue of [{ enabled: 'yes' }, { leaseSeconds: 0 }, { urlEnv: 'TRITON_MYSQL_URL' }, { unknown: true }])
       expect(() => resolveConfig({ queue })).toThrow()
     const config = resolveConfig({ repoRoot: '/tmp/op', queue: { enabled: true, urlEnv: 'MQ_SECRET' } })

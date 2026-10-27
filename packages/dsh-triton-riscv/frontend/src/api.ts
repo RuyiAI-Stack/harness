@@ -8,9 +8,10 @@ import type {
   Session,
   SessionBundle,
 } from './types'
+import { authFetch } from './auth'
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
+  const response = await authFetch(path, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -39,7 +40,10 @@ export const api = {
       body: JSON.stringify({ pinned }),
     }),
   deleteSession: async (sessionId: string) => {
-    const response = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' })
+    const response = await authFetch(`/api/sessions/${sessionId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    })
     if (!response.ok) {
       const error = (await response.json().catch(() => null)) as { detail?: string } | null
       throw new Error(error?.detail || response.statusText || '删除会话失败')

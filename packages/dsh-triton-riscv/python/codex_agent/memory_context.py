@@ -31,7 +31,7 @@ def _priority(kind: str, query: str) -> int:
                          (("error", "failure", "错误", "失败"), ["error", "diagnosis"])]:
         if any(word in query.lower() for word in words):
             order = kinds + [k for k in order if k not in kinds]
-    order = ["conflict", "gap"] + [k for k in order if k not in {"conflict", "gap"}]
+    order = ["retrieved_chunk", "conflict", "gap"] + [k for k in order if k not in {"conflict", "gap"}]
     return order.index(kind) if kind in order else len(order)
 
 
@@ -106,6 +106,8 @@ def pack_context(memories: list[dict], max_chars: int = 6000, query_text: str = 
     if not memories:
         return "No sufficiently relevant verified memory was retrieved."[:max_chars]
     tables: dict[str, dict] = {"sources": {}, "runs": {}, "proposals": {}}
+    if any(item.get("expansion") for item in memories):
+        tables["environments"] = {}
     refs: dict[str, dict] = {name: {} for name in tables}
 
     def reference(table: str, value: object) -> str | None:
@@ -133,12 +135,14 @@ def pack_context(memories: list[dict], max_chars: int = 6000, query_text: str = 
                 "repair_causality": chain.get("repair_causality", "not-established"),
                 "conflicts": len(chain.get("conflicts", [])) or chain.get("conflict_count", 0),
                 "gaps": len(chain.get("gaps", [])) or chain.get("gap_count", 0)}
+        if item.get("expansion"):
+            core["expansion"] = {k: v for k, v in item["expansion"].items() if k != "layers"}
         cases.append(core)
         for entry in entries(item):
             # Content identity is scoped to provenance, state and attempt, not just text.
             identity = serialize({key: entry.get(key) for key in (
                 "source", "source_sha256", "pointer", "lines", "run_id", "proposal_id",
-                "attempt", "kind", "state", "relation", "available_at", "time_basis", "text", "truncated")})
+                "attempt", "kind", "state", "relation", "available_at", "time_basis", "text", "truncated", "layer", "case_version")})
             eid = _metadata(entry.get("evidence_id"))
             if identity in identities:
                 other = candidates[identities[identity]]
@@ -158,15 +162,30 @@ def pack_context(memories: list[dict], max_chars: int = 6000, query_text: str = 
                 base["source_lines"] = entry["lines"]
             if entry.get("truncated"):
                 base["upstream_truncated"] = True
-            candidates.append({"base": base, "versions": _variants(str(entry.get("text", "")), base["kind"]),
-                               "priority": _priority(base["kind"], query_text), "ordinal": len(candidates)})
+            if "layer" in entry:
+                for key in ("layer", "part_index", "part_count", "overlap_may_repeat",
+                            "omitted_fields", "omitted_units", "body_line_ranges"):
+                    if key in entry:
+                        base[key] = entry[key]
+                base = {k: v for k, v in base.items() if v is not None and not (k == "overlap_may_repeat" and v is False)}
+            text = str(entry.get("text", ""))
+            if entry.get("layer") == 1:
+                # Share identical recorded environments without discarding version details.
+                background = json.loads(text)
+                base["environment"] = reference("environments", background.pop("environment", {}))
+                text = serialize(background)
+            # Expanded snippets are already bounded; never cut a hit/neighbor or patch in half again.
+            variants = ([{"text": text}] if "layer" in entry
+                        else _variants(str(entry.get("text", "")), base["kind"]))
+            candidates.append({"base": base, "versions": variants,
+                               "priority": entry.get("layer", _priority(base["kind"], query_text)), "ordinal": len(candidates)})
 
     def document(selection: dict[int, int]) -> dict:
         selected = [{**candidates[i]["base"], **candidates[i]["versions"][level]}
                     for i, level in sorted(selection.items())]
         needed = {name: set() for name in tables}
         for row in cases + selected:
-            for key, table in (("source", "sources"), ("run", "runs"), ("proposal", "proposals")):
+            for key, table in (("source", "sources"), ("run", "runs"), ("proposal", "proposals"), ("environment", "environments")):
                 if row.get(key):
                     needed[table].add(row[key])
         table_view = {name: {key: value for key, value in values.items() if key in needed[name]}
@@ -212,6 +231,13 @@ def pack_context(memories: list[dict], max_chars: int = 6000, query_text: str = 
     for case in cases:
         for i in by_case[case["ref"]]:
             if i in chosen or (candidates[i]["versions"] and fits(i, 0)):
+                break
+    # Keep minimum parent context beside the hit before adding stage evidence or neighbors.
+    for case in cases:
+        for i in by_case[case["ref"]]:
+            if candidates[i]["base"].get("layer") == 1:
+                if candidates[i]["versions"]:
+                    fits(i, 0)
                 break
     if allocation == "equal":
         queue = []

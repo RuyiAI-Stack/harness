@@ -1,6 +1,23 @@
-import { Bot, Check, Menu, PanelRight, Pin, PinOff, Play, Plus, Send, Trash2, UserRound, X } from 'lucide-react'
+import {
+  Bot,
+  Check,
+  GitBranch,
+  Menu,
+  PanelRight,
+  Pin,
+  PinOff,
+  Play,
+  Plus,
+  Send,
+  Trash2,
+  UserRound,
+  X,
+} from 'lucide-react'
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { api } from './api'
+import { accountName, accountStreamUrl, authFetch } from './auth'
+import { WorkflowPanel } from './WorkflowPanel'
+import { workflowApi } from './workflow-api'
 import { MessageText, shortDate } from './format'
 import type { Bootstrap, Run, RunEvent, ProposalReview, Session, SessionBundle, ValidationPlanReview } from './types'
 
@@ -83,7 +100,7 @@ function ProposalApproval({
   const proposalId = event.payload.proposal_id
   const proposalType = event.payload.proposal_type
   const [proposal, setProposal] = useState<ProposalReview | null>(null)
-  const [reviewer, setReviewer] = useState('ada-cl25')
+  const [reviewer, setReviewer] = useState(accountName() || 'ada-cl25')
   const [pending, setPending] = useState(false)
   const [continued, setContinued] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -132,7 +149,12 @@ function ProposalApproval({
         <>
           <label>
             审查人
-            <input value={reviewer} maxLength={120} onChange={item => setReviewer(item.target.value)} />
+            <input
+              value={reviewer}
+              readOnly={Boolean(accountName())}
+              maxLength={120}
+              onChange={item => setReviewer(item.target.value)}
+            />
           </label>
           <div className="proposal-actions">
             <button
@@ -185,7 +207,7 @@ function CommandApproval({
 }) {
   const validationRunId = event.payload.validation_run_id
   const [plan, setPlan] = useState<ValidationPlanReview | null>(null)
-  const [reviewer, setReviewer] = useState('ada-cl25')
+  const [reviewer, setReviewer] = useState(accountName() || 'ada-cl25')
   const [pending, setPending] = useState(false)
   const [launched, setLaunched] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -253,7 +275,12 @@ function CommandApproval({
         <>
           <label>
             审查人
-            <input value={reviewer} maxLength={120} onChange={item => setReviewer(item.target.value)} />
+            <input
+              value={reviewer}
+              readOnly={Boolean(accountName())}
+              maxLength={120}
+              onChange={item => setReviewer(item.target.value)}
+            />
           </label>
           <div className="proposal-actions">
             <button
@@ -288,6 +315,8 @@ function CommandApproval({
 export default function App() {
   const [bootstrap, setBootstrap] = useState<Bootstrap | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
+  const [workflowEnabled, setWorkflowEnabled] = useState(false)
+  const [mode, setMode] = useState<'chat' | 'workflow'>('chat')
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [bundle, setBundle] = useState<SessionBundle | null>(null)
   const [activeRun, setActiveRun] = useState<Run | null>(null)
@@ -356,14 +385,18 @@ export default function App() {
 
   const createSession = async () => {
     setError(null)
-    const session = await api.createSession()
-    await refreshSessions()
-    await loadSession(session.id)
+    try {
+      const session = await api.createSession()
+      await refreshSessions()
+      await loadSession(session.id)
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : '创建会话失败')
+    }
   }
 
   const openStream = (runId: string, sessionId: string, after: number) => {
     closeStream()
-    const stream = new EventSource(`/api/runs/${runId}/events/stream?after=${after}`)
+    const stream = new EventSource(accountStreamUrl(`/api/runs/${runId}/events/stream?after=${after}`))
     eventSource.current = stream
     stream.onmessage = async message => {
       const item = JSON.parse(message.data) as RunEvent
@@ -396,6 +429,11 @@ export default function App() {
     stream.onerror = () => {
       setError('任务状态连接已中断，可以重新打开该会话继续查看结果。')
       closeStream()
+      void authFetch('/api/auth/me')
+        .then(response => {
+          if (response.status === 401) window.dispatchEvent(new Event('triton:signout'))
+        })
+        .catch(() => {})
     }
   }
 
@@ -413,6 +451,12 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false
+    void workflowApi
+      .config()
+      .then(config => {
+        if (!cancelled) setWorkflowEnabled(config.enabled)
+      })
+      .catch(() => {})
     const start = async () => {
       try {
         const [initialBootstrap, initialSessions] = await Promise.all([api.bootstrap(), api.listSessions()])
@@ -614,7 +658,11 @@ export default function App() {
               className={`session-button ${session.id === activeSessionId ? 'active' : ''}`}
               key={session.id}
               type="button"
-              onClick={() => void loadSession(session.id)}
+              onClick={() =>
+                void loadSession(session.id).catch(reason =>
+                  setError(reason instanceof Error ? reason.message : '读取会话失败'),
+                )
+              }
               onContextMenu={event => {
                 event.preventDefault()
                 setSessionMenu({
@@ -651,17 +699,37 @@ export default function App() {
             <h2>{bundle?.session.title || '新对话'}</h2>
           </div>
           <div className="chat-heading-actions">
-            <span className="mode-badge">DeepSeek Harness</span>
-            <button
-              className="icon-button"
-              type="button"
-              title={drawer === 'inspector' ? '关闭任务详情' : '打开任务详情'}
-              aria-label={drawer === 'inspector' ? '关闭任务详情' : '打开任务详情'}
-              aria-expanded={drawer === 'inspector'}
-              onClick={() => setDrawer(current => (current === 'inspector' ? null : 'inspector'))}
-            >
-              <PanelRight size={18} />
-            </button>
+            <div className="workflow-modes" role="tablist" aria-label="Agent 模式">
+              <button role="tab" aria-selected={mode === 'chat'} title="Harness 对话" onClick={() => setMode('chat')}>
+                <Bot size={15} />
+                对话
+              </button>
+              <button
+                role="tab"
+                aria-selected={mode === 'workflow'}
+                title={workflowEnabled ? '多智能体任务' : '后端尚未启用多智能体'}
+                disabled={!workflowEnabled}
+                onClick={() => {
+                  setMode('workflow')
+                  setDrawer(null)
+                }}
+              >
+                <GitBranch size={15} />
+                多智能体
+              </button>
+            </div>
+            {mode === 'chat' && (
+              <button
+                className="icon-button"
+                type="button"
+                title={drawer === 'inspector' ? '关闭任务详情' : '打开任务详情'}
+                aria-label={drawer === 'inspector' ? '关闭任务详情' : '打开任务详情'}
+                aria-expanded={drawer === 'inspector'}
+                onClick={() => setDrawer(current => (current === 'inspector' ? null : 'inspector'))}
+              >
+                <PanelRight size={18} />
+              </button>
+            )}
           </div>
         </div>
         {error && (
@@ -672,115 +740,121 @@ export default function App() {
             </button>
           </div>
         )}
-        <div className="messages" aria-live="polite">
-          {!bundle?.messages.length ? (
-            <EmptyConversation />
-          ) : (
-            bundle.messages.map(message => {
-              return (
-                <article className={`message ${message.role}`} key={message.id}>
-                  {message.role === 'assistant' && (
-                    <div className="message-avatar agent-avatar" role="img" aria-label="Agent">
-                      <Bot size={17} />
-                    </div>
-                  )}
+        {mode === 'workflow' && activeSessionId ? (
+          <WorkflowPanel key={activeSessionId} sessionId={activeSessionId} enabled={workflowEnabled} />
+        ) : (
+          <>
+            <div className="messages" aria-live="polite">
+              {!bundle?.messages.length ? (
+                <EmptyConversation />
+              ) : (
+                bundle.messages.map(message => {
+                  return (
+                    <article className={`message ${message.role}`} key={message.id}>
+                      {message.role === 'assistant' && (
+                        <div className="message-avatar agent-avatar" role="img" aria-label="Agent">
+                          <Bot size={17} />
+                        </div>
+                      )}
+                      <div className="message-content">
+                        <div className="message-body">
+                          <MessageText value={message.content} />
+                        </div>
+                      </div>
+                      {message.role === 'user' && (
+                        <div className="message-avatar user-avatar" role="img" aria-label="用户">
+                          <UserRound size={17} />
+                        </div>
+                      )}
+                    </article>
+                  )
+                })
+              )}
+              {streamingText && (
+                <article className="message assistant streaming-message" aria-label="Agent 正在回复">
+                  <div className="message-avatar agent-avatar" role="img" aria-label="Agent">
+                    <Bot size={17} />
+                  </div>
                   <div className="message-content">
                     <div className="message-body">
-                      <MessageText value={message.content} />
+                      <MessageText value={streamingText} />
+                      <span className="typing-cursor" aria-hidden="true" />
                     </div>
                   </div>
-                  {message.role === 'user' && (
-                    <div className="message-avatar user-avatar" role="img" aria-label="用户">
-                      <UserRound size={17} />
-                    </div>
-                  )}
                 </article>
-              )
-            })
-          )}
-          {streamingText && (
-            <article className="message assistant streaming-message" aria-label="Agent 正在回复">
-              <div className="message-avatar agent-avatar" role="img" aria-label="Agent">
-                <Bot size={17} />
+              )}
+              {agentWorking && !streamingText && (
+                <article className="message assistant streaming-message" aria-label="Agent 正在处理任务">
+                  <div className="message-avatar agent-avatar" role="img" aria-label="Agent">
+                    <Bot size={17} />
+                  </div>
+                  <div className="message-content">
+                    <div className="message-body typing-indicator" aria-hidden="true">
+                      <span />
+                      <span />
+                      <span />
+                    </div>
+                  </div>
+                </article>
+              )}
+              <div ref={messagesEnd} />
+            </div>
+            {approvalEvents.length > 0 && (
+              <div className="approval-dock" aria-label="待审批提案">
+                {approvalEvents.map(event =>
+                  event.payload.validation_run_id ? (
+                    <CommandApproval
+                      event={event}
+                      key={event.id}
+                      onResolved={dismissApproval}
+                      onExecute={executeValidation}
+                    />
+                  ) : (
+                    <ProposalApproval
+                      event={event}
+                      key={event.id}
+                      onResolved={dismissApproval}
+                      onContinue={continueProposal}
+                    />
+                  ),
+                )}
               </div>
-              <div className="message-content">
-                <div className="message-body">
-                  <MessageText value={streamingText} />
-                  <span className="typing-cursor" aria-hidden="true" />
-                </div>
-              </div>
-            </article>
-          )}
-          {agentWorking && !streamingText && (
-            <article className="message assistant streaming-message" aria-label="Agent 正在处理任务">
-              <div className="message-avatar agent-avatar" role="img" aria-label="Agent">
-                <Bot size={17} />
-              </div>
-              <div className="message-content">
-                <div className="message-body typing-indicator" aria-hidden="true">
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              </div>
-            </article>
-          )}
-          <div ref={messagesEnd} />
-        </div>
-        {approvalEvents.length > 0 && (
-          <div className="approval-dock" aria-label="待审批提案">
-            {approvalEvents.map(event =>
-              event.payload.validation_run_id ? (
-                <CommandApproval
-                  event={event}
-                  key={event.id}
-                  onResolved={dismissApproval}
-                  onExecute={executeValidation}
-                />
-              ) : (
-                <ProposalApproval
-                  event={event}
-                  key={event.id}
-                  onResolved={dismissApproval}
-                  onContinue={continueProposal}
-                />
-              ),
             )}
-          </div>
+            <div className="suggestions">
+              {bootstrap?.suggestions.map(suggestion => (
+                <button
+                  className="suggestion-button"
+                  type="button"
+                  title={suggestion}
+                  key={suggestion}
+                  onClick={() => setInput(suggestion)}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+            <form className="composer" onSubmit={submit}>
+              <textarea
+                value={input}
+                rows={2}
+                maxLength={12000}
+                placeholder="描述你想检查、开发或分析的 Triton-RISCV 任务..."
+                aria-label="任务描述"
+                onChange={event => setInput(event.target.value)}
+                onKeyDown={inputKeyDown}
+              />
+              <button
+                className="send-button"
+                type="submit"
+                title="发送任务"
+                aria-label="发送任务"
+                disabled={busy || !input.trim()}
+              >
+                <Send size={18} />
+              </button>
+            </form>
+          </>
         )}
-        <div className="suggestions">
-          {bootstrap?.suggestions.map(suggestion => (
-            <button
-              className="suggestion-button"
-              type="button"
-              title={suggestion}
-              key={suggestion}
-              onClick={() => setInput(suggestion)}
-            >
-              {suggestion}
-            </button>
-          ))}
-        </div>
-        <form className="composer" onSubmit={submit}>
-          <textarea
-            value={input}
-            rows={2}
-            maxLength={12000}
-            placeholder="描述你想检查、开发或分析的 Triton-RISCV 任务..."
-            aria-label="任务描述"
-            onChange={event => setInput(event.target.value)}
-            onKeyDown={inputKeyDown}
-          />
-          <button
-            className="send-button"
-            type="submit"
-            title="发送任务"
-            aria-label="发送任务"
-            disabled={busy || !input.trim()}
-          >
-            <Send size={18} />
-          </button>
-        </form>
       </main>
 
       <aside className="inspector-panel">

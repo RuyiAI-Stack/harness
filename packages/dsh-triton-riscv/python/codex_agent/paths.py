@@ -7,7 +7,10 @@ from codex_agent.runtime_config import runtime_config
 
 def repository_root() -> Path:
     value = runtime_config().repoRoot
-    return Path(value).expanduser().resolve() if value else Path.cwd().resolve()
+    root = Path(value).expanduser().resolve() if value else Path.cwd().resolve()
+    from codex_agent.accounts.guard import check_workspace
+    check_workspace(root)
+    return root
 
 
 def state_root(repo_root: Path) -> Path:

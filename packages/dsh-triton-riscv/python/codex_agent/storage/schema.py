@@ -1,4 +1,4 @@
-"""Version-one schema. Every domain key is scoped to a canonical workspace."""
+"""Current MySQL schema. Every domain key is scoped to a canonical workspace."""
 from sqlalchemy import (BigInteger, Column, Float, ForeignKeyConstraint, Index,
                         Integer, MetaData, String, Table, UniqueConstraint)
 from sqlalchemy.dialects.mysql import LONGTEXT
@@ -73,13 +73,26 @@ memories = table("memories", Column("id", BigInteger, primary_key=True, autoincr
                  Column("useful_count", BigInteger, nullable=False, server_default="0"),
                  text("embedding_json", nullable=True), Column("embedding_provider", String(255)),
                  Column("embedding_model", String(255)), Column("embedding_dim", Integer),
+                 Column("case_version", String(64)),
                  UniqueConstraint("workspace_id", "fingerprint"))
+memory_versions = table("memory_versions",
+               Column("memory_id", BigInteger, primary_key=True, autoincrement=False),
+               Column("case_version", String(64), primary_key=True), text("payload_json"),
+               timestamp("captured_at"),
+               ForeignKeyConstraint(["workspace_id", "memory_id"],
+                                    ["memories.workspace_id", "memories.id"], ondelete="CASCADE"))
 chunks = table("memory_chunks", Column("memory_id", BigInteger, primary_key=True, autoincrement=False),
                Column("kind", String(64), primary_key=True),
                Column("position", Integer, primary_key=True, autoincrement=False), text("text"),
                text("source_field"), text("embedding_json", nullable=True),
                Column("embedding_provider", String(255)), Column("embedding_model", String(255)),
                Column("embedding_dim", Integer),
+               Column("case_version", String(64)), Column("chunk_id", String(64)),
+               Column("unit_id", String(64)), Column("part_index", Integer),
+               Column("part_count", Integer), text("provenance_json", nullable=True),
+               ForeignKeyConstraint(["workspace_id", "memory_id", "case_version"],
+                                    ["memory_versions.workspace_id", "memory_versions.memory_id",
+                                     "memory_versions.case_version"], name="fk_chunks_version", ondelete="CASCADE"),
                ForeignKeyConstraint(["workspace_id", "memory_id"],
                                     ["memories.workspace_id", "memories.id"], ondelete="CASCADE"))
 references = table("references_catalog", Column("id", String(64), primary_key=True),
@@ -90,5 +103,28 @@ Index("idx_runs_session", runs.c.workspace_id, runs.c.session_id, runs.c.created
 Index("idx_memories_active", memories.c.workspace_id, memories.c.active)
 Index("idx_memories_operator", memories.c.workspace_id, memories.c.operator)
 Index("idx_memories_stage", memories.c.workspace_id, memories.c.failure_stage)
+Index("idx_chunks_unit", chunks.c.workspace_id, chunks.c.memory_id, chunks.c.case_version, chunks.c.unit_id)
+Index("idx_chunks_identity", chunks.c.workspace_id, chunks.c.chunk_id, unique=True)
+
+memory_indexes = table("memory_indexes", Column("generation", String(64), primary_key=True),
+    Column("status", String(24), nullable=False), text("config_json"),
+    Column("fingerprint", String(64), nullable=False), Column("collection", String(100), nullable=False))
+memory_index_entries = table("memory_index_entries",
+    Column("generation", String(64), primary_key=True),
+    Column("memory_id", BigInteger, primary_key=True, autoincrement=False),
+    Column("revision", BigInteger, nullable=False), Column("case_version", String(64)),
+    Column("desired", String(16), nullable=False), Column("status", String(24), nullable=False),
+    Column("job_id", String(64), nullable=False), Column("point_count", Integer, nullable=False),
+    ForeignKeyConstraint(["workspace_id", "generation"],
+                         ["memory_indexes.workspace_id", "memory_indexes.generation"]))
+# Versioned indexed text remains auditable even after the source case is archived/deleted.
+memory_index_chunks = table("memory_index_chunks",
+    Column("generation", String(64), primary_key=True),
+    Column("memory_id", BigInteger, primary_key=True, autoincrement=False),
+    Column("revision", BigInteger, primary_key=True, autoincrement=False),
+    Column("chunk_id", String(64), primary_key=True), Column("point_id", String(36), nullable=False),
+    Column("case_version", String(64), nullable=False), text("text"), text("provenance_json"),
+    ForeignKeyConstraint(["workspace_id", "generation"],
+                         ["memory_indexes.workspace_id", "memory_indexes.generation"]))
 
 TABLES = {t.name: t for t in metadata.tables.values()}

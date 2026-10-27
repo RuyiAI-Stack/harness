@@ -2,6 +2,14 @@
 
 A Harness plugin for operator development, testing, repair, and historical evidence retrieval.
 
+### Shared plugins
+
+- [`dsh-vector-retrieval`](../dsh-vector-retrieval/README.md): embedding providers and scoped vector storage/search.
+- [`dsh-multi-agent`](../dsh-multi-agent/README.md): isolated Harness runs and usage accounting.
+
+This plugin owns operator contracts, role prompts, approvals, evidence expansion and remote validation.
+The repository installer installs all three backends. Existing data and indexing settings remain valid.
+
 ### Required environment
 
 ```text
@@ -76,6 +84,12 @@ Open **http://127.0.0.1:8765**. FastAPI serves the built frontend; no separate f
 
 Live requests need separate `ISRC_API_KEY` and `DSH_MODEL` settings. Workbench and native sessions are independent.
 
+### Account Workbench
+
+For invite-only team access, use the [account gateway](python/codex_agent/README.md#account-gateway)
+instead of exposing the single-user workbench. It serves the same frontend with
+registration, login and private per-account workspaces. Native Harness login is separate.
+
 ### Optional Redis Cache
 
 Use a private standalone Redis with a memory limit and `maxmemory-policy noeviction`.
@@ -94,13 +108,15 @@ See [backend options](python/codex_agent/README.md#redis-options).
 
 ### Development Tests
 
-Vitest drives JavaScript, Python and native-host integration tests. After setup,
+Vitest drives JavaScript, existing Python regressions, frontend and native-host integration tests. After setup,
 from the plugin directory, configure **disposable** services (never production):
 
 ```sh
 export TRITON_MYSQL_URL='mysql+pymysql://USER:PASSWORD@127.0.0.1:3306/triton_agent_test'
 export TRITON_TEST_REDIS_URL='redis://127.0.0.1:6379/0'
+export TRITON_AUTH_REDIS_URL='redis://127.0.0.1:6380/0'
 export TRITON_TEST_AMQP_URL='amqp://guest:guest@127.0.0.1:5672/'
+export TRITON_TEST_QDRANT_URL='http://127.0.0.1:6333'
 .venv/bin/python -I -m codex_agent.storage upgrade
 npm test
 ```

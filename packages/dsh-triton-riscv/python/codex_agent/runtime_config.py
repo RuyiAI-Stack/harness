@@ -74,12 +74,27 @@ class Memory(Settings):
 
 
 class Queue(Settings):
+    proposalWorkflows: bool = False
     enabled: bool = False
     urlEnv: str = "TRITON_AMQP_URL"
     leaseSeconds: int = Field(default=60, ge=15, le=600)
     maxAttempts: int = Field(default=3, ge=1, le=10)
     jobTimeoutSeconds: int = Field(default=1200, ge=30, le=7200)
     maxPending: int = Field(default=100, ge=1, le=10000)
+
+
+class Indexing(Settings):
+    enabled: bool = False
+    generation: str = Field(default="v1", pattern=r"^[A-Za-z0-9_-]{1,64}$")
+    embedding: Embedding = Field(default_factory=Embedding)
+    modelRevision: str = ""
+    dimensions: int = Field(default=384, ge=1, le=65536)
+    qdrantUrl: str = "http://127.0.0.1:6333"
+    apiKeyEnv: str = "TRITON_QDRANT_API_KEY"
+    maxTokens: int = Field(default=180, ge=32, le=8192)
+    overlapTokens: int = Field(default=24, ge=0, le=1024)
+    batchSize: int = Field(default=32, ge=1, le=128)
+    timeoutSeconds: int = Field(default=30, ge=1, le=120)
 
 
 class RuntimeConfig(Settings):
@@ -92,6 +107,7 @@ class RuntimeConfig(Settings):
     storage: Storage = Field(default_factory=Storage)
     cache: Cache = Field(default_factory=Cache)
     queue: Queue = Field(default_factory=Queue)
+    indexing: Indexing = Field(default_factory=Indexing)
 
 
 def _unique(pairs):
@@ -126,7 +142,7 @@ def _parse_native(raw: str) -> RuntimeConfig:
         for path in (cfg.repoRoot, cfg.stateDir):
             if not path or not Path(path).is_absolute():
                 raise ValueError("workspace and state paths must be absolute")
-        for path in (cfg.memory.embedding.tokenizerJson,):
+        for path in (cfg.memory.embedding.tokenizerJson, cfg.indexing.embedding.tokenizerJson):
             if path and not Path(path).is_absolute():
                 raise ValueError("memory paths must be absolute")
         remote = cfg.remote
@@ -159,6 +175,27 @@ def _parse_native(raw: str) -> RuntimeConfig:
                 or key.startswith(("TRITON_RISCV_", "RISCV_"))
                 or key in {"PATH", "HOME", "PYTHONPATH", "PYTHONHOME"}):
             raise ValueError("reserved or invalid credential variable")
+        index = cfg.indexing
+        for index_key in (index.apiKeyEnv, index.embedding.apiKeyEnv):
+            if (not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", index_key)
+                    or index_key.startswith(("TRITON_RISCV_", "RISCV_"))
+                    or index_key in {"PATH", "HOME", "PYTHONPATH", "PYTHONHOME", db_key, cache_key, mq_key}):
+                raise ValueError("invalid indexing credential variable")
+        from urllib.parse import urlsplit
+        url = urlsplit(index.qdrantUrl)
+        if (url.scheme not in {"http", "https"} or not url.hostname or url.username
+                or url.password or url.query or url.fragment):
+            raise ValueError("invalid Qdrant URL; use apiKeyEnv for credentials")
+        if index.embedding.baseUrl:
+            url = urlsplit(index.embedding.baseUrl)
+            if (url.scheme not in {"http", "https"} or not url.hostname or url.username
+                    or url.password or url.query or url.fragment):
+                raise ValueError("invalid embedding URL; use apiKeyEnv for credentials")
+        if index.overlapTokens >= index.maxTokens:
+            raise ValueError("index overlap must be smaller than chunk budget")
+        if index.enabled and (index.embedding.provider not in {"sentence-transformers", "openai-compatible", "ollama"}
+                              or not index.embedding.model or not index.modelRevision):
+            raise ValueError("indexing requires an explicit embedding model and revision")
         return cfg
     except (ValueError, TypeError, RecursionError):
         # Do not echo supplied values: malformed documents may accidentally include secrets.

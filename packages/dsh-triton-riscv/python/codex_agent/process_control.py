@@ -28,6 +28,7 @@ def validation_environment() -> dict[str, str]:
             if not key.startswith("TRITON_RISCV_ALLOW_")
             and not key.endswith(("API_KEY", "ACCESS_TOKEN", "AUTH_TOKEN", "PASSWORD"))
             and key not in {CONFIG_ENV, credential, database_credential, cache_credential, queue_credential,
+                           settings.indexing.apiKeyEnv, settings.indexing.embedding.apiKeyEnv,
                            "TRITON_AMQP_URL",
                            "TRITON_REDIS_URL", "TRITON_MYSQL_URL", "SSH_AUTH_SOCK", "GH_TOKEN", "GITHUB_TOKEN"}}
 
