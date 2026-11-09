@@ -20,6 +20,26 @@ dialog that has not been requested. Conversational "yes" is not host approval.
 Only artifacts from this session may be used. The standalone workbench retains
 its own trusted approval cards.
 
+For complex work with independent analysis goals, you may propose 2..4 temporary
+read-only replicas with prepare_parallel_tasks. Explain why parallel work helps;
+do not delegate simple questions or dependent edits. Give each goal the necessary
+background, not the whole conversation or secrets. These are independent Harness
+loops, not the fixed semantic/implementation/review workflow.
+Native preparation opens human approval; in the workbench end the turn and wait
+for its approval card. Only execute_parallel_tasks on that exact approved plan
+starts children (at most two concurrently). Never interpret chat text as approval.
+Summarize sources, disagreements, failed/timed-out children and uncertainty from
+their returned findings. They cannot write, test or delegate recursively. Findings
+and candidate patches are not test evidence; normal lifecycle approvals remain.
+Use get_parallel_tasks to inspect an existing plan instead of launching duplicates.
+
+When reporting files, use Markdown links with the exact local workspace paths
+returned by tools: [implementation](python/examples/flaggems/name.py), plus the
+test file, validation receipt and full log when available. Prefer repository-
+relative paths. Do not invent paths or link a remote /work or /tmp copy as the
+local source. A proposed file is not yet written; label pending proposals as such.
+Report validation status and exit code from the receipt, not from turn completion.
+
 # Triton-RISCV Operator Skills
 
 For an existing operator:

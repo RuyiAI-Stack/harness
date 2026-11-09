@@ -50,7 +50,15 @@ ToolCandidateStrategy = (
     Literal["record-top5"] if runtime_config().memory.retrievalMode == "qdrant" else CandidateStrategy
 )
 
-server = MCPServer(
+class ScopedMCPServer(MCPServer):
+    def tool(self, *args, **kwargs):
+        from codex_agent.harness.delegation import READ_TOOLS
+        if os.environ.get("TRITON_REPLICA_READ_ONLY") == "1" and kwargs.get("name") not in READ_TOOLS:
+            return lambda function: function
+        return super().tool(*args, **kwargs)
+
+
+server = ScopedMCPServer(
     name="triton-riscv-tools",
     title="Triton-RISCV Operator Tools",
     description="Guarded operator discovery, validation, diagnosis, and repair tools.",
@@ -62,6 +70,45 @@ def repository_root() -> Path:
 
     from codex_agent.paths import repository_root as resolve_root
     return resolve_root()
+
+
+@server.tool(name="prepare_parallel_tasks", structured_output=True,
+             annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False))
+def prepare_parallel_tasks(reason: str, tasks: list[dict[str, str]], context: str = "") -> dict[str, Any]:
+    """Propose 2..4 independent read-only replicas, each {goal: text}. No child starts.
+
+    Use only when independent source/retrieval analysis benefits a complex task.
+    Explain why; include necessary background but no secrets. After preparation,
+    end the turn and wait for the human approval UI. Chat text cannot grant approval.
+    """
+    from codex_agent.harness.delegation import Plans, trusted_scope, base_settings
+    root = repository_root()
+    scope = trusted_scope()
+    return Plans(root).prepare(scope, {"reason": reason, "tasks": tasks, "context": context}, base_settings(root, scope))
+
+
+@server.tool(name="execute_parallel_tasks", structured_output=True,
+             annotations=ToolAnnotations(read_only_hint=False, destructive_hint=False, open_world_hint=True))
+def execute_parallel_tasks(plan_id: str) -> dict[str, Any]:
+    """Run exactly the human-approved parallel plan; completed plans replay, not rerun.
+
+    Each child independently reads/retrieves with the configured Harness loop.
+    Findings are proposals, NOT validation evidence. Summarize disagreements,
+    failures and sources; write/test tools still need their own approval.
+    """
+    from codex_agent.harness.delegation import Plans, trusted_scope, base_settings
+    root = repository_root()
+    scope = trusted_scope()
+    return Plans(root).execute(plan_id, scope["session_id"], base_settings(root, scope))
+
+
+@server.tool(name="get_parallel_tasks", structured_output=True,
+             annotations=ToolAnnotations(read_only_hint=True, destructive_hint=False))
+def get_parallel_tasks(plan_id: str) -> dict[str, Any]:
+    """Read this session's durable replica findings; never execute or approve."""
+    from codex_agent.harness.delegation import Plans, trusted_scope
+    plans = Plans(repository_root())
+    return plans.public(plans.load(plan_id, trusted_scope()["session_id"]))
 
 
 @server.tool(name="inspect_project", structured_output=True,

@@ -36,12 +36,23 @@ export interface Run {
   updated_at: string
 }
 
+export interface ModelRoute {
+  tier: 'fast' | 'strong' | 'default'
+  model: string
+  provider: string
+  reason: string
+  timeout_seconds: number
+  input_bytes: number
+  policy_fingerprint: string
+}
+
 export interface RunEvent {
   id: string
   run_id: string
   sequence: number
   event_type: string
-  payload: {
+  payload: Partial<ModelRoute> & {
+    scope?: 'chat' | 'role' | 'replica'
     line?: string
     message?: string
     text?: string
@@ -54,7 +65,9 @@ export interface RunEvent {
     turn?: number
     proposal_id?: string
     proposal_type?: 'development' | 'repair'
-    approval_type?: 'proposal' | 'command'
+    approval_type?: 'proposal' | 'command' | 'parallel'
+    plan_id?: string
+    summary?: string
     validation_run_id?: string
     operator?: string
     [key: string]: unknown
@@ -86,6 +99,28 @@ export interface ValidationPlanReview {
   }
 }
 
+export type ParallelPlanStatus =
+  'pending' | 'approved' | 'rejected' | 'running' | 'completed' | 'partial' | 'cancelled' | 'unknown'
+
+export interface ParallelPlan {
+  plan_id: string
+  session_id: string
+  reason: string
+  context: string
+  user_request: string
+  tasks: { task_id: string; goal: string; route?: ModelRoute }[]
+  status: ParallelPlanStatus
+  model: string
+  provider?: string
+  base_url?: string
+  max_tool_calls?: number
+  max_parallel: number
+  timeout_seconds: number
+  tools: string[]
+  results: unknown[]
+  digest: string
+}
+
 export interface SessionBundle {
   session: Session
   messages: Message[]
@@ -106,6 +141,13 @@ export interface Bootstrap {
     model: string
     api_configured: boolean
     remote_configured: boolean
+    routing?: {
+      enabled: boolean
+      fastModel: string
+      strongModel: string
+      fastTimeoutSeconds: number
+      strongTimeoutSeconds: number
+    }
   }
   suggestions: string[]
 }

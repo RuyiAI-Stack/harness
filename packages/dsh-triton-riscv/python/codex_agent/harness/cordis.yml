@@ -61,12 +61,15 @@
       (() => {
         const c = JSON.parse(process.env.TRITON_RISCV_CONFIG ?? '{}');
         const keys = ['TRITON_RISCV_CONFIG', 'TRITON_RISCV_STATE_DIR', 'TRITON_WORKBENCH_OWNER',
+          'TRITON_PARALLEL_SCOPE', 'DSH_PROVIDER', 'DSH_MODEL', 'DSH_API_KEY_ENV', 'ISRC_BASE_URL',
+          'TRITON_RISCV_MCP_PYTHON',
           'TRITON_RISCV_ALLOW_VALIDATION', 'TRITON_RISCV_ALLOW_REPAIR_APPLY',
           'TRITON_RISCV_ALLOW_DEVELOPMENT_APPLY', 'TRITON_RISCV_REQUIRE_REMOTE',
           'TRITON_RISCV_REQUIRE_APPROVED_VALIDATION', 'RISCV_HOST', 'RISCV_REPO',
           c.storage?.urlEnv ?? 'TRITON_MYSQL_URL',
           c.memory?.embedding?.apiKeyEnv ?? 'AGENT_EMBEDDING_API_KEY'];
         if (c.cache?.enabled) keys.push(c.cache.urlEnv ?? 'TRITON_REDIS_URL');
+        if (process.env.TRITON_PARALLEL_SCOPE) keys.push(process.env.DSH_API_KEY_ENV ?? 'ISRC_API_KEY');
         if (c.queue?.enabled || c.indexing?.enabled) keys.push(c.queue?.urlEnv ?? 'TRITON_AMQP_URL');
         if (c.indexing?.enabled) keys.push(c.indexing.apiKeyEnv ?? 'TRITON_QDRANT_API_KEY',
           c.indexing.embedding?.apiKeyEnv ?? 'AGENT_EMBEDDING_API_KEY');

@@ -26,16 +26,19 @@ from .store import WorkflowStore
 
 
 class WorkflowLifecycle:
-    def __init__(self, root):
+    def __init__(self, root, *, publication_owner=None):
         self.root = Path(root).resolve()
         self.jobs = JobStore(self.root)
         self.store = WorkflowStore(self.root, database=self.jobs.db)
+        self.publication_owner = publication_owner
 
     def view(self, task_id):
         task = self.store.get(task_id)
         link = task["result"].get("lifecycle", {})
-        task.update(proposal=None, validation_plan=None, acceptance=None, artifact_error=None)
+        task.update(proposal=None, validation_plan=None, acceptance=None, artifact_error=None, parallel_plan=None)
         try:
+            from .parallel import WorkflowParallel
+            task["parallel_plan"] = WorkflowParallel(self.root, jobs=self.jobs).view(task)
             if link.get("proposal_id"):
                 task["proposal"] = (development.get_operator_development_proposal(self.root, link["proposal_id"])
                     if link.get("proposal_kind") == "development" else lifecycle.get_repair_proposal(self.root, link["proposal_id"]))
@@ -114,7 +117,14 @@ class WorkflowLifecycle:
             if step["status"] != "completed":
                 raise Conflict("all proposal steps must be completed and current")
             job = self.jobs.get(step["job_id"])
-            if job["status"] != "succeeded" or job["payload"].get("workflow_id") != task["id"]:
+            owned_publication = False
+            if self.publication_owner and job["id"] == self.publication_owner[0] and job["status"] == "running":
+                with self.jobs.db.transaction() as conn:
+                    owned = self.jobs.require_owner(conn, job["id"], self.publication_owner[1])
+                    if owned["cancel_requested"]:
+                        raise Conflict("workflow cancelled before proposal publication")
+                owned_publication = True
+            if (job["status"] != "succeeded" and not owned_publication) or job["payload"].get("workflow_id") != task["id"]:
                 raise Conflict("proposal job is not completed or belongs to another workflow")
             result = load_role_output(self.jobs.db, task["id"], step)
             if result is None or result.status != "completed" or result.unknowns:

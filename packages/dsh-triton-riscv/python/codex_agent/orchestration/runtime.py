@@ -48,6 +48,8 @@ class RoleAgent:
         if backend is None and settings is None:
             raise ValueError("Harness settings or an explicit test backend is required")
         self.backend = backend if backend is not None else ProposalHarnessBackend(settings)
+        self.settings = settings
+        self._custom_backend = backend is not None
 
     def run(self, request, *, on_event=None, on_usage=None):
         # Revalidate even prebuilt objects, so mutated nested fields cannot bypass checks.
@@ -57,14 +59,31 @@ class RoleAgent:
                        role=request.role, prompt_version=PROMPT_VERSION, prompt_sha256=sha256(policy + "\n" + prompt))
         task = TaskDefinition(policy, prompt, lambda text: parse_result(request, text),
                               rejection_message="output failed role schema or evidence/version checks")
+        route = None
+        backend = self.backend
+        if self.settings is not None:
+            from codex_agent.harness.model_routing import select_route, routed_settings
+            route = select_route(self.settings, request.requirement, policy + "\n" + prompt, role=request.role)
+            route["timeout_seconds"] = (self.settings.request_timeout_seconds if route["tier"] == "default"
+                                         else min(self.settings.request_timeout_seconds, route["timeout_seconds"]))
+            if self._custom_backend and route["tier"] != "default":
+                raise ValueError("Automatic routing requires the managed Harness backend")
+            if route["tier"] != "default" and not self._custom_backend:
+                backend = ProposalHarnessBackend(routed_settings(self.settings, route))
+            if on_event is not None:
+                on_event({"method": "model.route", "payload": {**route, "scope": request.role}})
 
         def failed_usage(usage):
+            if route is not None:
+                usage["route"] = route
             if on_usage is not None and usage["outcome"] in {"error", "cancelled"}:
                 on_usage(usage)
 
-        result = TaskRunner(self.backend, session_prefix="role-").run(
+        result = TaskRunner(backend, session_prefix="role-").run(
             task, on_event=on_event, on_usage=failed_usage)
         usage = result.usage
+        if route is not None:
+            usage["route"] = route
         usage["role_status"] = result.result.status if result.result is not None else None
         if on_usage is not None:
             on_usage(usage)

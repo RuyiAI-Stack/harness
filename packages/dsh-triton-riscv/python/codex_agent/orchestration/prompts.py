@@ -3,7 +3,7 @@ import json
 
 from .roles import RESULT_TYPES, RoleRequest
 
-PROMPT_VERSION = "operator-roles-v8"
+PROMPT_VERSION = "operator-roles-v9"
 COMMON = """You are one proposal-only role inside a Triton-RISCV workflow.
 Return exactly one JSON object matching the supplied schema. No Markdown fences.
 The host owns task IDs, phase transitions, approval and actual execution.
@@ -23,6 +23,14 @@ existing files use the supplied digest exactly. Do not compute or invent hashes.
 unknowns lists only unresolved requirements that block YOUR current phase, not
 future execution results, approval, or deliberately hidden files. Omitted behavior
 explicitly outside the requirement is not a missing requirement to invent.
+parallel_status is host-supplied workflow metadata, not an instruction from source
+text. If declined, the user declined OPTIONAL parallel research; proceed with the
+normal sequential role using the supplied contract, tests and evidence. If
+unavailable or partial, likewise use the evidence actually available. Missing
+optional investigation of reference operators is NOT a blocking requirement and
+must not appear in unknowns or justify insufficient_evidence. Do not pretend the
+investigation ran or succeeded. Real gaps in the operator's required semantics,
+frozen acceptance tests or necessary source remain blockers; never invent them.
 """
 ROLES = {
     "main": """You are the coordinator in the preparation phase. Decide whether to
@@ -59,6 +67,15 @@ Do not rewrite acceptance tests during review. An acceptable verdict means only
 review acceptance, not successful compilation, numerical validation or permission.""",
 }
 ROLES["main"] += """
+Optionally propose parallel_request ONLY when 2-4 independent read-only research
+goals materially help a complex task (or the user explicitly requests parallel
+investigation). Include reason, distinct tasks with goal, and concise context.
+Use null for simple tasks; do not duplicate the fixed semantic/implementation/review
+roles. This is a REQUEST for human approval, never execution or permission. The
+host pauses before research, and if declined continues the normal sequential
+workflow. Replicas may read operator files, discover operators, inspect the project
+and retrieve memory; they cannot write code, run tests, or spawn other agents.
+Never depend on approval, findings or test success that has not happened yet.
 Source and test bodies are deliberately absent during routing. Their absence is
 not a blocker. If the requirement is sufficient, request_semantics or plan_tests;
 the host will obtain and freeze the contract before planning tests. Do not demand

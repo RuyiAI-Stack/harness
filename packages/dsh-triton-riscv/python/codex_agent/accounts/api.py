@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from redis.exceptions import RedisError
 from sqlalchemy.exc import SQLAlchemyError
 
-from .store import AccountError, Accounts, digest
+from .store import AccountError, Accounts, MIN_PASSWORD_LENGTH, digest
 from .workspaces import Workbenches
 
 
@@ -25,13 +25,14 @@ class Credentials(BaseModel):
 
 
 class Registration(Credentials):
+    password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=128)
     invitation: str = Field(min_length=1, max_length=128)
 
 
 class PasswordChange(BaseModel):
     model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
     old_password: str = Field(min_length=1, max_length=128)
-    new_password: str = Field(min_length=12, max_length=128)
+    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=128)
 
 
 async def limited_body(request, limit):
@@ -96,7 +97,8 @@ def create_gateway(config, *, accounts=None, workbenches=None):
         response.headers["Cache-Control"] = "no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+        if "Content-Security-Policy" not in response.headers:
+            response.headers["Content-Security-Policy"] = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
         if config.secure_cookie:
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
         return response
@@ -107,7 +109,7 @@ def create_gateway(config, *, accounts=None, workbenches=None):
         # A browser tab may still display A after another tab rotates the cookie to B.
         # This is a consistency check, never an alternative source of identity.
         expected = [request.headers.get("x-triton-account")]
-        if request.url.path.endswith("/events/stream"):
+        if request.url.path.endswith("/events/stream") or request.url.path == "/api/workspace/files":
             expected.extend(request.query_params.getlist("account_id"))
         if any(value is not None and value != user["id"] for value in expected):
             raise AccountError(401, "Account changed; reload before continuing")
@@ -190,7 +192,7 @@ def create_gateway(config, *, accounts=None, workbenches=None):
                 target += "?" + request.url.query
             upstream = await client.send(client.build_request(request.method, target, content=content, headers=headers), stream=True)
             response_headers = {k: v for k, v in upstream.headers.items() if k.lower() in {
-                "content-type", "content-disposition"}}
+                "content-type", "content-disposition", "content-security-policy"}}
             response_headers["Cache-Control"] = "no-store"
         except BaseException:
             if upstream:

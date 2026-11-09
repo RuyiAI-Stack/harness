@@ -64,7 +64,7 @@ REQUIRED_VERSIONS = {
     "reviewing": {"contract_sha256", "tests_sha256", "source_sha256"},
     "waiting_approval": {"contract_sha256", "tests_sha256", "source_sha256"},
 }
-WAITING = {"waiting_approval", "waiting_validation_approval", "waiting_validation", "applying"}
+WAITING = {"waiting_parallel_approval", "waiting_approval", "waiting_validation_approval", "waiting_validation", "applying"}
 TERMINAL = {"succeeded", "failed", "cancelled", "blocked", "needs_reconciliation"}
 # Execution transitions belong to the evidence/approval adapter, not agent text.
 PROTECTED_STATES = {"waiting_validation", "repairing", "succeeded"}

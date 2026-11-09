@@ -97,6 +97,15 @@ class Indexing(Settings):
     timeoutSeconds: int = Field(default=30, ge=1, le=120)
 
 
+class ModelRouting(Settings):
+    enabled: bool = False
+    fastModel: str = Field(default="", max_length=256)
+    strongModel: str = Field(default="", max_length=256)
+    fastMaxInputBytes: int = Field(default=12000, ge=256, le=64000)
+    fastTimeoutSeconds: int = Field(default=120, ge=30, le=300)
+    strongTimeoutSeconds: int = Field(default=300, ge=30, le=300)
+
+
 class RuntimeConfig(Settings):
     schemaVersion: Literal[1] = 1
     repoRoot: str = ""
@@ -108,6 +117,7 @@ class RuntimeConfig(Settings):
     cache: Cache = Field(default_factory=Cache)
     queue: Queue = Field(default_factory=Queue)
     indexing: Indexing = Field(default_factory=Indexing)
+    modelRouting: ModelRouting = Field(default_factory=ModelRouting)
 
 
 def _unique(pairs):
@@ -139,6 +149,8 @@ def _parse_native(raw: str) -> RuntimeConfig:
             raise ValueError("unsupported configuration version")
         _single_line(data)
         cfg = RuntimeConfig.model_validate(data)
+        from dsh_multi_agent.routing import RoutingPolicy
+        RoutingPolicy(**cfg.modelRouting.model_dump())
         for path in (cfg.repoRoot, cfg.stateDir):
             if not path or not Path(path).is_absolute():
                 raise ValueError("workspace and state paths must be absolute")

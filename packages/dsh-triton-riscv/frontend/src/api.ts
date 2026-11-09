@@ -4,6 +4,7 @@ import type {
   Run,
   RunEvent,
   ProposalReview,
+  ParallelPlan,
   ValidationPlanReview,
   Session,
   SessionBundle,
@@ -50,6 +51,20 @@ export const api = {
     }
   },
   getSessionApprovals: (sessionId: string) => request<RunEvent[]>(`/api/sessions/${sessionId}/approvals`),
+  getParallelPlan: (sessionId: string, planId: string) =>
+    request<ParallelPlan>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/parallel-plans/${encodeURIComponent(planId)}`,
+    ),
+  decideParallelPlan: (sessionId: string, planId: string, approved: boolean, digest: string) =>
+    request<ParallelPlan>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/parallel-plans/${encodeURIComponent(planId)}/decision`,
+      { method: 'POST', body: JSON.stringify({ approved, digest }) },
+    ),
+  cancelParallelPlan: (sessionId: string, planId: string) =>
+    request<ParallelPlan>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/parallel-plans/${encodeURIComponent(planId)}/cancel`,
+      { method: 'POST', body: JSON.stringify({}) },
+    ),
   sendMessage: (sessionId: string, content: string, requestId: string = crypto.randomUUID()) =>
     request<MessageResult>(`/api/sessions/${sessionId}/messages`, {
       method: 'POST',

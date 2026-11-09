@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, StringConstraints, model_validator
 from codex_agent.operator_development import NewOperatorSpec
+from codex_agent.harness.delegation import PlanRequest
 
 from .models import Contract, Identifier, InputVersions, Role, Sha256, ROLES_BY_STATE, REQUIRED_VERSIONS
 
@@ -57,6 +58,7 @@ class RoleRequest(Contract):
     kind: Literal["create", "repair"]
     operator: Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")]
     requirement: Text
+    parallel_status: Literal["not_requested", "declined", "completed", "partial", "unavailable"] = "not_requested"
     versions: InputVersions
     evidence: list[Evidence] = Field(default_factory=list, max_length=32)
     files: list[FileSnapshot] = Field(default_factory=list, max_length=2)
@@ -103,6 +105,7 @@ class CommonResult(Contract):
 
 
 class MainResult(CommonResult):
+    parallel_request: PlanRequest | None = None
     decision: Literal["request_semantics", "plan_tests", "ask_user", "blocked"]
     questions: Notes = Field(default_factory=list)
 

@@ -62,6 +62,11 @@ try:
             if data.get('settings_after_checkpoint'):
                 f.backend.settings.model = 'changed-after-checkpoint'
         if data.get('changed_model'): f.backend.settings.model = 'different-model'
+        if data.get('changed_routing'):
+            import codex_agent.orchestration.reuse as reuse_module
+            from codex_agent.runtime_config import ModelRouting
+            changed = reuse_module.runtime_config().model_copy(update={'modelRouting':ModelRouting(enabled=True, strongModel='changed')})
+            reuse_module.runtime_config = lambda: changed
         if data.get('legacy'): del f.backend.settings
         if data.get('unreadable_environment'):
             (f.root / 'scripts/triton-riscv-env.sh').mkdir(parents=True)
@@ -193,7 +198,7 @@ describe('host-verified frozen preparation reuse', () => {
     expect(value.usage.workflows[1].preparation_reuse.status).toBe('reused')
   }, 65000)
 
-  it.each(['disabled', 'changed_model', 'legacy', 'corrupt_plan', 'unreadable_environment'])(
+  it.each(['disabled', 'changed_model', 'changed_routing', 'legacy', 'corrupt_plan', 'unreadable_environment'])(
     'uses the full route for %s',
     key => {
       const value = invoke({ [key]: true })

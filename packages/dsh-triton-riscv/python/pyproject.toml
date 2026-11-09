@@ -30,4 +30,4 @@ testpaths = ["codex_agent/tests"]
 norecursedirs = ["fixtures"]
 
 [tool.setuptools.package-data]
-codex_agent = ["*.json", "README.md", "specs/*.json", "tests/fixtures/*.json", "tests/fixtures/*.sql", "harness/*.yml", "harness/bundle/*", "harness/bundle/lib/*.js", "harness/bundle/prompts/*.md", "orchestration/*.mjs", "frontend/dist/*", "frontend/dist/assets/*", "storage/migrations/*.py", "storage/migrations/versions/*.py"]
+codex_agent = ["*.json", "README.md", "specs/*.json", "tests/fixtures/*.json", "tests/fixtures/*.sql", "harness/*.yml", "harness/*.mjs", "harness/bundle/*", "harness/bundle/lib/*.js", "harness/bundle/prompts/*.md", "orchestration/*.mjs", "frontend/dist/*", "frontend/dist/assets/*", "storage/migrations/*.py", "storage/migrations/versions/*.py"]
