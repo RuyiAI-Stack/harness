@@ -489,12 +489,26 @@ class HarnessRunExecutor:
         recorded_proposals: set[str] = set()
         recorded_validation_plans: set[str] = set()
         recorded_validation_receipts: set[str] = set()
+        recorded_parallel_plans: set[str] = set()
         latest_validation_evidence = no_validation_evidence()
         harness_error: str | None = None
+
+        def publish_parallel_plans():
+            from codex_agent.harness.delegation import Plans
+            for plan in Plans(self.repo_root).pending(run["session_id"]):
+                if plan["run_id"] == run_id and plan["plan_id"] not in recorded_parallel_plans:
+                    recorded_parallel_plans.add(plan["plan_id"])
+                    self.store.add_event(run_id, "approval-required", {
+                        "approval_type": "parallel", "plan_id": plan["plan_id"],
+                        "status": "pending", "summary": plan["spec"]["reason"],
+                    })
 
         def record_event(notification: dict[str, Any]) -> None:
             nonlocal event_count, harness_error, latest_validation_evidence
             event_count += 1
+            if notification.get("method") == "model.route":
+                self.store.add_event(run_id, "model-route", notification["payload"])
+                return
             harness_error = self._notification_error(notification) or harness_error
             self.store.add_event(
                 run_id,
@@ -503,6 +517,8 @@ class HarnessRunExecutor:
             )
             for event_type, payload in self._public_events(notification):
                 self.store.add_event(run_id, event_type, payload)
+            if (self._harness_event(notification) or {}).get("type") == "tool/result":
+                publish_parallel_plans()
             for proposal in self._proposal_references(notification):
                 proposal_id = proposal["proposal_id"]
                 if proposal_id not in recorded_proposals:
@@ -544,11 +560,13 @@ class HarnessRunExecutor:
                 )
 
         try:
-            result = self.agent.run(
-                self._managed_task(run) if self.agent.settings.managed_context else request["task"],
-                session_id=request["harness_session_id"],
-                on_event=record_event,
-            )
+            from codex_agent.harness.delegation import host_scope
+            with host_scope(run["session_id"], run_id, request["task"]):
+                result = self.agent.run(
+                    self._managed_task(run) if self.agent.settings.managed_context else request["task"],
+                    session_id=request["harness_session_id"], on_event=record_event,
+                )
+            publish_parallel_plans()
             final_response = result.final_response.strip()
             finish_reason = (result.finish_reason or "unknown").lower()
             if finish_reason in {"error", "cancelled", "canceled"}:

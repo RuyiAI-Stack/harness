@@ -224,7 +224,7 @@ describe('lossless role prompt projection', () => {
   })
   it('keeps isolation, reference interpretation and approval rules in the system policy', () => {
     const result = invoke(review())
-    expect(result.version).toBe('operator-roles-v8')
+    expect(result.version).toBe('operator-roles-v9')
     for (const instruction of [
       'cannot approve changes',
       'No tools are available',

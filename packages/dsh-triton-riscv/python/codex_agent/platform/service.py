@@ -47,6 +47,7 @@ class PlatformService:
         return self.store.create_session(title)
 
     def bootstrap(self) -> dict:
+        from codex_agent.harness.model_routing import routing_status
         return {
             "product": "Triton-RISCV Agent",
             "operators": self.operator_inventory().get("summary", {}),
@@ -63,6 +64,7 @@ class PlatformService:
                 "plugin": self.settings.plugin.public_metadata(),
                 "provider": self.settings.provider,
                 "model": self.settings.model,
+                "routing": routing_status(self.settings),
                 "api_configured": bool(self.settings.api_key),
                 "remote_configured": bool(
                     self.settings.remote_host and self.settings.remote_root

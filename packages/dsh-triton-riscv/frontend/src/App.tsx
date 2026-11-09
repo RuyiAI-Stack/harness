@@ -17,8 +17,9 @@ import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
 import { api } from './api'
 import { accountName, accountStreamUrl, authFetch } from './auth'
 import { WorkflowPanel } from './WorkflowPanel'
+import { ParallelPlanCard } from './ParallelPlanCard'
 import { workflowApi } from './workflow-api'
-import { MessageText, shortDate } from './format'
+import { MessageText, ModelRouteSummary, shortDate } from './format'
 import type { Bootstrap, Run, RunEvent, ProposalReview, Session, SessionBundle, ValidationPlanReview } from './types'
 
 const terminalStatuses = new Set(['completed', 'failed', 'cancelled'])
@@ -47,6 +48,10 @@ function evidenceLabel(verdict?: string): string {
 }
 
 function timelineTitle(event: RunEvent): string {
+  if (event.event_type === 'model-route') {
+    const scopes: Record<string, string> = { chat: '对话模型路由', role: '角色模型路由', replica: '副本模型路由' }
+    return scopes[event.payload.scope || ''] || '模型路由'
+  }
   if (event.event_type === 'agent-step') {
     const labels: Record<string, string> = {
       analysis: '分析任务',
@@ -69,13 +74,19 @@ function timelineTitle(event: RunEvent): string {
   return labels[event.event_type] || event.event_type
 }
 
+function approvalKey(event: RunEvent): string {
+  if (event.payload.approval_type === 'parallel') return `parallel:${event.payload.plan_id || event.id}`
+  if (event.payload.validation_run_id) return `command:${event.payload.validation_run_id}`
+  if (event.payload.proposal_id) return `proposal:${event.payload.proposal_type}:${event.payload.proposal_id}`
+  return `event:${event.id}`
+}
+
 function uniqueApprovals(rows: RunEvent[]): RunEvent[] {
-  const byProposal = new Map<string, RunEvent>()
+  const byApproval = new Map<string, RunEvent>()
   rows.forEach(event => {
-    const key = event.payload.proposal_id || event.payload.validation_run_id || String(event.id)
-    byProposal.set(key, event)
+    byApproval.set(approvalKey(event), event)
   })
-  return [...byProposal.values()]
+  return [...byApproval.values()]
 }
 
 function EmptyConversation() {
@@ -335,6 +346,9 @@ export default function App() {
   const eventSource = useRef<EventSource | null>(null)
   const messagesEnd = useRef<HTMLDivElement | null>(null)
   const pendingRequest = useRef<{ session: string; text: string; id: string } | null>(null)
+  const currentSession = useRef<string | null>(null)
+  const approvalRefresh = useRef(0)
+  const sending = useRef(false)
 
   const closeStream = () => {
     eventSource.current?.close()
@@ -348,10 +362,18 @@ export default function App() {
   }
 
   const refreshApprovals = async (sessionId: string) => {
+    if (currentSession.current !== sessionId) return
+    const refresh = ++approvalRefresh.current
     const rows = uniqueApprovals(await api.getSessionApprovals(sessionId))
+    if (currentSession.current !== sessionId || refresh !== approvalRefresh.current) return
     const unresolved = await Promise.all(
       rows.map(async event => {
         try {
+          if (event.payload.approval_type === 'parallel') {
+            if (!event.payload.plan_id) return false
+            const plan = await api.getParallelPlan(sessionId, event.payload.plan_id)
+            return ['pending', 'approved', 'running', 'unknown'].includes(plan.status)
+          }
           if (event.payload.validation_run_id) {
             const plan = await api.getValidationPlan(event.payload.validation_run_id)
             return plan.approval.status !== 'rejected' && !plan.approval.execution_run_id
@@ -366,21 +388,26 @@ export default function App() {
         return false
       }),
     )
-    setApprovalEvents(rows.filter((_, index) => unresolved[index]))
+    if (currentSession.current === sessionId && refresh === approvalRefresh.current) {
+      setApprovalEvents(rows.filter((_, index) => unresolved[index]))
+    }
   }
 
   const loadSession = async (sessionId: string) => {
     closeStream()
+    currentSession.current = sessionId
+    setApprovalEvents([])
     setStreamingText('')
     setActiveSessionId(sessionId)
     const nextBundle = await api.getSession(sessionId)
+    if (currentSession.current !== sessionId) return
     setBundle(nextBundle)
     const run = nextBundle.runs[0] || null
     setActiveRun(run)
     setEvents([])
     setDrawer(null)
     await refreshApprovals(sessionId)
-    if (run) await loadRun(run, sessionId)
+    if (run && currentSession.current === sessionId) await loadRun(run, sessionId)
   }
 
   const createSession = async () => {
@@ -399,6 +426,7 @@ export default function App() {
     const stream = new EventSource(accountStreamUrl(`/api/runs/${runId}/events/stream?after=${after}`))
     eventSource.current = stream
     stream.onmessage = async message => {
+      if (currentSession.current !== sessionId || eventSource.current !== stream) return
       const item = JSON.parse(message.data) as RunEvent
       setEvents(current => [...current, item])
       if (item.event_type === 'assistant-delta' && item.payload.text) {
@@ -408,25 +436,31 @@ export default function App() {
         setStreamingText('')
       }
       if (item.event_type === 'approval-required') {
+        approvalRefresh.current += 1
         setApprovalEvents(current => uniqueApprovals([...current, item]))
       }
       if (['completed', 'failed', 'cancelled'].includes(item.event_type)) {
         try {
           const run = await api.getRun(runId)
+          if (currentSession.current !== sessionId || eventSource.current !== stream) return
           setActiveRun(run)
           if (terminalStatuses.has(run.status)) {
             setStreamingText('')
             closeStream()
-            setBundle(await api.getSession(sessionId))
+            const nextBundle = await api.getSession(sessionId)
+            if (currentSession.current !== sessionId) return
+            setBundle(nextBundle)
             await refreshApprovals(sessionId)
           }
         } catch (streamError) {
+          if (currentSession.current !== sessionId) return
           setError(streamError instanceof Error ? streamError.message : '读取运行状态失败')
           closeStream()
         }
       }
     }
     stream.onerror = () => {
+      if (currentSession.current !== sessionId || eventSource.current !== stream) return
       setError('任务状态连接已中断，可以重新打开该会话继续查看结果。')
       closeStream()
       void authFetch('/api/auth/me')
@@ -439,13 +473,15 @@ export default function App() {
 
   const loadRun = async (run: Run, sessionId: string) => {
     const [currentRun, runEvents] = await Promise.all([api.getRun(run.id), api.getEvents(run.id)])
+    if (currentSession.current !== sessionId) return
     setActiveRun(currentRun)
     setEvents(runEvents)
     if (['queued', 'running'].includes(currentRun.status)) {
       const after = runEvents.at(-1)?.sequence ?? -1
       openStream(run.id, sessionId, after)
     } else if (terminalStatuses.has(currentRun.status)) {
-      setBundle(await api.getSession(sessionId))
+      const nextBundle = await api.getSession(sessionId)
+      if (currentSession.current === sessionId) setBundle(nextBundle)
     }
   }
 
@@ -472,6 +508,7 @@ export default function App() {
     void start()
     return () => {
       cancelled = true
+      currentSession.current = null
       closeStream()
     }
   }, [])
@@ -510,7 +547,10 @@ export default function App() {
   const agentWorking = Boolean(activeRun && ['queued', 'running'].includes(activeRun.status))
 
   const sendMessage = async (content: string) => {
-    if (!content.trim() || !activeSessionId || busy) return
+    if (!content.trim() || !activeSessionId || busy || sending.current || currentSession.current !== activeSessionId)
+      return false
+    sending.current = true
+    let sent = false
     setBusy(true)
     setStreamingText('')
     setError(null)
@@ -520,7 +560,9 @@ export default function App() {
         pendingRequest.current = { session: activeSessionId, text, id: crypto.randomUUID() }
       }
       const result = await api.sendMessage(activeSessionId, text, pendingRequest.current.id)
+      sent = true
       pendingRequest.current = null
+      if (currentSession.current !== activeSessionId) return true
       setBundle(current =>
         current
           ? {
@@ -540,10 +582,14 @@ export default function App() {
       await refreshApprovals(activeSessionId)
       await refreshSessions()
     } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : '发送失败')
+      if (currentSession.current === activeSessionId) {
+        setError(sendError instanceof Error ? sendError.message : '发送失败')
+      }
     } finally {
+      sending.current = false
       setBusy(false)
     }
+    return sent
   }
 
   const submit = (event: FormEvent) => {
@@ -609,6 +655,13 @@ export default function App() {
       `验证计划 ${validationRunId} 已由用户批准。请调用 validate_operator，设置 execute=true 且 approved_run_id="${validationRunId}"，只执行该计划对应的精确命令。` +
         '执行后如果失败，立即调用 diagnose_failure；若 source_repair_allowed=true，则按 repair_strategy 生成修复提案，等待用户审批后继续验证，直到通过或达到停止条件。',
     )
+  }
+
+  const continueParallelPlan = async (planId: string) => {
+    const sent = await sendMessage(
+      `并行计划 ${JSON.stringify(planId)} 已由用户批准。请调用 execute_parallel_tasks(plan_id=${JSON.stringify(planId)})，只执行该精确计划，不创建或替换计划。`,
+    )
+    if (!sent) throw new Error('继续执行消息未确认送达，可重试继续已批准计划。')
   }
 
   return (
@@ -802,17 +855,28 @@ export default function App() {
             {approvalEvents.length > 0 && (
               <div className="approval-dock" aria-label="待审批提案">
                 {approvalEvents.map(event =>
-                  event.payload.validation_run_id ? (
+                  event.payload.approval_type === 'parallel' ? (
+                    event.payload.plan_id && activeSessionId ? (
+                      <ParallelPlanCard
+                        key={`${activeSessionId}:${approvalKey(event)}`}
+                        sessionId={activeSessionId}
+                        planId={event.payload.plan_id}
+                        summary={event.payload.summary}
+                        disabled={busy || agentWorking}
+                        onContinue={continueParallelPlan}
+                      />
+                    ) : null
+                  ) : event.payload.validation_run_id ? (
                     <CommandApproval
                       event={event}
-                      key={event.id}
+                      key={approvalKey(event)}
                       onResolved={dismissApproval}
                       onExecute={executeValidation}
                     />
                   ) : (
                     <ProposalApproval
                       event={event}
-                      key={event.id}
+                      key={approvalKey(event)}
                       onResolved={dismissApproval}
                       onContinue={continueProposal}
                     />
@@ -889,9 +953,41 @@ export default function App() {
               </dd>
             </div>
             <div>
-              <dt>模型</dt>
+              <dt>默认模型</dt>
               <dd>{bootstrap?.harness.model || '未配置'}</dd>
             </div>
+            <div>
+              <dt>自动路由</dt>
+              <dd>
+                {bootstrap?.harness.routing
+                  ? bootstrap.harness.routing.enabled
+                    ? '已启用'
+                    : '已禁用'
+                  : bootstrap
+                    ? '未提供'
+                    : '加载中'}
+              </dd>
+            </div>
+            {bootstrap?.harness.routing && (
+              <>
+                <div>
+                  <dt>快速模型</dt>
+                  <dd>
+                    {bootstrap.harness.routing.fastModel
+                      ? `${bootstrap.harness.routing.fastModel}（${bootstrap.harness.routing.fastTimeoutSeconds} 秒）`
+                      : '未配置'}
+                  </dd>
+                </div>
+                <div>
+                  <dt>强力模型</dt>
+                  <dd>
+                    {bootstrap.harness.routing.strongModel
+                      ? `${bootstrap.harness.routing.strongModel}（${bootstrap.harness.routing.strongTimeoutSeconds} 秒）`
+                      : '未配置'}
+                  </dd>
+                </div>
+              </>
+            )}
             <div>
               <dt>API</dt>
               <dd>{bootstrap?.harness.api_configured ? '已配置' : '未配置'}</dd>
@@ -946,7 +1042,13 @@ export default function App() {
                 return (
                   <li className={active ? 'active' : 'done'} key={event.id}>
                     <strong>{timelineTitle(event)}</strong>
-                    <span>{String(label)}</span>
+                    <span>
+                      {event.event_type === 'model-route' ? (
+                        <ModelRouteSummary route={event.payload} />
+                      ) : (
+                        String(label)
+                      )}
+                    </span>
                     {event.payload.detail && <code>{event.payload.detail}</code>}
                   </li>
                 )

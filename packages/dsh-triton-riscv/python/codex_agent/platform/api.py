@@ -112,6 +112,10 @@ def create_app(
             return response
     from codex_agent.orchestration.api import router as workflow_router
     app.include_router(workflow_router(root))
+    from codex_agent.harness.delegation_api import router as parallel_router
+    app.include_router(parallel_router(root, store))
+    from codex_agent.platform.workspace_files import router as files_router
+    app.include_router(files_router(root))
     if react_frontend_available:
         app.mount(
             "/ui-assets",

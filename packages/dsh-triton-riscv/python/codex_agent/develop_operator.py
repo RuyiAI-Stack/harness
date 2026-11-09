@@ -409,6 +409,87 @@ classifies failures, and permits only bounded semantic-preserving repairs.
 """
 
 
+def _parameterized_vector_shapes(tree: ast.AST) -> set[tuple[int, ...]]:
+    """Recognize bounded scalar pytest sizes used by known 1D constructions."""
+    shapes = set()
+    for function in ast.walk(tree):
+        if not isinstance(function, ast.FunctionDef):
+            continue
+        vectors = {}
+        assignments = [node for node in ast.walk(function) if isinstance(node, ast.Assign)]
+        for node in assignments:
+            if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
+                continue
+            name, value = node.targets[0].id, node.value
+            vectors.pop(name, None)
+            if (isinstance(value, ast.Call) and ast.unparse(value.func) == "torch.tensor" and value.args
+                    and isinstance(value.args[0], (ast.List, ast.Tuple)) and value.args[0].elts
+                    and all(isinstance(item, (ast.Constant, ast.UnaryOp)) for item in value.args[0].elts)):
+                try:
+                    data = ast.literal_eval(value.args[0])
+                except (ValueError, TypeError):
+                    continue
+                if all(type(item) in {int, float} for item in data):
+                    vectors[name] = len(data)
+        for decorator in function.decorator_list:
+            if (not isinstance(decorator, ast.Call) or ast.unparse(decorator.func) != "pytest.mark.parametrize"
+                    or len(decorator.args) < 2 or not isinstance(decorator.args[0], ast.Constant)
+                    or not isinstance(decorator.args[0].value, str)
+                    or not isinstance(decorator.args[1], (ast.List, ast.Tuple))):
+                continue
+            parameter = decorator.args[0].value
+            values = decorator.args[1].elts
+            if (parameter not in {arg.arg for arg in function.args.args} or not 1 <= len(values) <= 128
+                    or not all(isinstance(value, ast.Constant) and type(value.value) is int
+                               and 0 < value.value < 2**31 for value in values)):
+                continue
+            sizes = [value.value for value in values]
+
+            def number(node, size, depth=0):
+                if depth > 16:
+                    raise ValueError("shape expression too deep")
+                if isinstance(node, ast.Constant) and type(node.value) is int:
+                    return node.value
+                if isinstance(node, ast.Name) and node.id == parameter:
+                    return size
+                if (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                        and isinstance(node.func.value, ast.Name) and node.func.value.id in vectors
+                        and node.func.attr == "numel" and not node.args and not node.keywords):
+                    return vectors[node.func.value.id]
+                if isinstance(node, ast.BinOp):
+                    left, right = number(node.left, size, depth + 1), number(node.right, size, depth + 1)
+                    if isinstance(node.op, ast.Add):
+                        return left + right
+                    if isinstance(node.op, ast.Sub):
+                        return left - right
+                    if isinstance(node.op, ast.Mult) and max(abs(left), abs(right)) < 2**53:
+                        return left * right
+                    if isinstance(node.op, ast.FloorDiv) and right > 0:
+                        return left // right
+                raise ValueError("unsupported shape expression")
+
+            for node in ast.walk(function):
+                if (isinstance(node, ast.Call) and ast.unparse(node.func) in {
+                        "torch.randn", "torch.rand", "torch.empty", "torch.zeros", "torch.ones"}
+                        and len(node.args) == 1 and isinstance(node.args[0], ast.Name)
+                        and node.args[0].id == parameter):
+                    shapes.update((size,) for size in sizes)
+                if (isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Slice)
+                        and node.slice.lower is None and node.slice.step is None
+                        and isinstance(node.slice.upper, ast.Name) and node.slice.upper.id == parameter
+                        and isinstance(node.value, ast.Call) and isinstance(node.value.func, ast.Attribute)
+                        and node.value.func.attr == "repeat" and len(node.value.args) == 1
+                        and isinstance(node.value.func.value, ast.Name)
+                        and node.value.func.value.id in vectors):
+                    try:
+                        length = vectors[node.value.func.value.id]
+                        if all(number(node.value.args[0], size) * length >= size for size in sizes):
+                            shapes.update((size,) for size in sizes)
+                    except ValueError:
+                        pass
+    return shapes
+
+
 def collect_literal_shapes(tree: ast.AST) -> set[tuple[int, ...]]:
     shapes: set[tuple[int, ...]] = set()
     for node in ast.walk(tree):
@@ -422,7 +503,7 @@ def collect_literal_shapes(tree: ast.AST) -> set[tuple[int, ...]]:
         else:
             if values:
                 shapes.add(tuple(values))
-    return shapes
+    return shapes | _parameterized_vector_shapes(tree)
 
 
 def audit_test_contract(spec: OperatorSpec, repo_root: Path) -> ContractAudit:

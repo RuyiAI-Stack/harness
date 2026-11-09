@@ -16,7 +16,7 @@ export function accountName() {
 export function accountStreamUrl(path: string) {
   if (!currentUser) return path
   const url = new URL(path, window.location.origin)
-  // EventSource cannot set custom headers. The account ID is not a credential.
+  // EventSource and file hyperlinks cannot set headers. This ID is not a credential.
   url.searchParams.set('account_id', currentUser.id)
   return url.pathname + url.search
 }

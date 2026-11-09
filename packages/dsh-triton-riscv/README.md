@@ -70,6 +70,43 @@ Validate relu_and_mul. Show the plan and run it after my approval.
 
 For remote tests, set `remote.host` and `remote.repository`; the server needs SSH access and the Triton/Buddy/LLVM toolchain.
 
+### Parallel Analysis
+
+For complex independent investigations, the assistant can propose temporary replicas.
+Review their goals, context and model in the approval dialog/card before they start.
+Structured multi-agent workflows also support this optional step. Declining it
+resumes the normal sequential workflow; approving it adds read-only findings before implementation.
+Each replica runs its own Harness loop with read-only source and retrieval tools:
+2 concurrent replicas, up to 4 subtasks, 8 tool calls and at most 300 seconds per replica.
+Writes and tests still require separate lifecycle approval. Results are findings, not test passes.
+Replica calls use the configured Responses model route (`DSH_PROVIDER`, `DSH_MODEL`,
+`DSH_API_KEY_ENV`, `ISRC_BASE_URL`); native sessions must match that provider.
+The local capacity guard allows 4 replicas per OS user, not a cluster-wide quota.
+
+### Optional Model Routing
+
+Add to the plugin's `config` (or the workbench's versioned `TRITON_RISCV_CONFIG`):
+
+```yaml
+modelRouting:
+  enabled: true
+  fastModel: YOUR_FAST_MODEL_ID
+  strongModel: YOUR_STRONG_MODEL_ID
+  fastMaxInputBytes: 12000
+  fastTimeoutSeconds: 120
+  strongTimeoutSeconds: 300
+```
+
+Both IDs must be available through the current provider, endpoint and API key.
+Bounded information tasks may use `fast`; code, review and unclear tasks use `strong`.
+Missing `fastModel` uses the strong/current model. Routing is off by default.
+The byte limit is a conservative routing gate, not a token count or a context-window guarantee.
+Applies to managed workbench turns, proposal roles and approved replicas; native main-chat
+and unmanaged legacy sessions keep their host model. Child models are shown before approval;
+changed routing settings require a new plan. Errors do not trigger an extra paid retry.
+Role/child deadlines use the values above; parent turns retain their existing outer
+deadline so they can await child batches or validation tools.
+
 ### Optional Workbench
 
 After installation, run from the repository root:
@@ -89,6 +126,8 @@ Live requests need separate `ISRC_API_KEY` and `DSH_MODEL` settings. Workbench a
 For invite-only team access, use the [account gateway](python/codex_agent/README.md#account-gateway)
 instead of exposing the single-user workbench. It serves the same frontend with
 registration, login and private per-account workspaces. Native Harness login is separate.
+Passwords require 6 to 128 characters. This is a trusted-workbench policy, not a
+recommendation for public deployment; use strong, unique passwords.
 
 ### Optional Redis Cache
 

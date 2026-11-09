@@ -97,4 +97,43 @@ describe('FastAPI client', () => {
 
     await expect(api.sendMessage('session-1', '')).rejects.toThrow('message cannot be empty')
   })
+
+  it('reads and cancels session-scoped parallel plans with encoded identifiers', async () => {
+    const plan = { plan_id: 'plan/1', session_id: 'session/1', status: 'cancelled' }
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(plan))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await api.getParallelPlan('session/1', 'plan/1')).toEqual(plan)
+    expect(await api.cancelParallelPlan('session/1', 'plan/1')).toEqual(plan)
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/sessions/session%2F1/parallel-plans/plan%2F1',
+      expect.any(Object),
+    )
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/sessions/session%2F1/parallel-plans/plan%2F1/cancel',
+      expect.objectContaining({ method: 'POST', body: '{}' }),
+    )
+  })
+
+  it.each([true, false])('sends approved=%s and the exact parallel-plan digest', async approved => {
+    const plan = { plan_id: 'plan-1', status: approved ? 'approved' : 'rejected' }
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(plan))
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await api.decideParallelPlan('session-1', 'plan-1', approved, 'reviewed-digest')).toEqual(plan)
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/sessions/session-1/parallel-plans/plan-1/decision',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ approved, digest: 'reviewed-digest' }),
+      }),
+    )
+  })
+
+  it('surfaces wrong-digest decisions without retrying', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ detail: 'digest mismatch' }, false))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(api.decideParallelPlan('session-1', 'plan-1', true, 'wrong-digest')).rejects.toThrow('digest mismatch')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })

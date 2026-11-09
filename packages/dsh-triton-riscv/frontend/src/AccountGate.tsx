@@ -220,7 +220,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
                     required
                     minLength={3}
                     maxLength={32}
-                    pattern="[a-zA-Z0-9][a-zA-Z0-9_-]{2,31}"
+                    pattern="[a-zA-Z0-9][a-zA-Z0-9_\-]{2,31}"
                   />
                 </label>
                 <label>
@@ -230,7 +230,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
                     name="password"
                     autoComplete={register ? 'new-password' : 'current-password'}
                     required
-                    minLength={register ? 12 : 1}
+                    minLength={register ? 6 : 1}
                     maxLength={128}
                   />
                 </label>
@@ -307,7 +307,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
               </label>
               <label>
                 新密码
-                <input name="new" type="password" required minLength={12} maxLength={128} autoComplete="new-password" />
+                <input name="new" type="password" required minLength={6} maxLength={128} autoComplete="new-password" />
               </label>
               <label>
                 确认新密码
@@ -315,7 +315,7 @@ export function AccountGate({ children }: { children: ReactNode }) {
                   name="confirm"
                   type="password"
                   required
-                  minLength={12}
+                  minLength={6}
                   maxLength={128}
                   autoComplete="new-password"
                 />
