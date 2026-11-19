@@ -2,6 +2,7 @@ export interface AccountUser {
   id: string
   username: string
   csrf_token: string
+  is_admin?: boolean
 }
 let currentUser: AccountUser | null = null
 let accountRevision = 0
@@ -37,6 +38,12 @@ export async function authFetch(path: string, options: RequestInit = {}): Promis
   const json = response.json.bind(response)
   response.json = async () => {
     const body = await json()
+    assertCurrent()
+    return body
+  }
+  const blob = response.blob.bind(response)
+  response.blob = async () => {
+    const body = await blob()
     assertCurrent()
     return body
   }

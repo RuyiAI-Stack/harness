@@ -76,18 +76,22 @@ def create_gateway(config, *, accounts=None, workbenches=None):
     @app.middleware("http")
     async def boundary(request, call_next):
         try:
+            upload = request.method == "POST" and request.url.path == "/api/admin/knowledge/files"
+            review = request.method == "POST" and request.url.path in {"/api/admin/knowledge", "/api/admin/knowledge/confirm"}
             if request.headers.get("host", "").lower() != urlsplit(config.origin).netloc.lower():
                 raise AccountError(400, "Unexpected host")
             if request.method not in {"GET", "HEAD", "OPTIONS"}:
                 if request.headers.get("origin") != config.origin:
                     raise AccountError(403, "Same-origin request required")
-                if request.headers.get("content-type", "").split(";")[0] != "application/json":
-                    raise AccountError(415, "JSON request required")
+                expected_type = "application/octet-stream" if upload else "application/json"
+                if request.headers.get("content-type", "").split(";")[0] != expected_type:
+                    raise AccountError(415, "Binary file required" if upload else "JSON request required")
             if request.url.path.startswith("/api/"):
                 if request.headers.get("sec-fetch-site") == "cross-site":
                     raise AccountError(403, "Cross-site request rejected")
                 length = request.headers.get("content-length")
-                if length and (not length.isdigit() or int(length) > 2 * 1024 * 1024):
+                limit = (12 if upload else 8 if review else 2) * 1024 * 1024
+                if length and (not length.isdigit() or int(length) > limit):
                     raise AccountError(413, "Request too large")
             response = await call_next(request)
         except AccountError as error:
@@ -120,7 +124,7 @@ def create_gateway(config, *, accounts=None, workbenches=None):
     @app.get("/api/auth/me")
     async def me(request: Request):
         _, user = await user_for(request, touch=False)
-        return {"enabled": True, "user": user}
+        return {"enabled": True, "user": {**user, "is_admin": user["id"] in config.admin_user_ids}}
 
     async def credentials(request, schema):
         ip = request.client.host if request.client else "unknown"
@@ -147,7 +151,7 @@ def create_gateway(config, *, accounts=None, workbenches=None):
         if old and old != token:
             # Rotation must not accept a browser-supplied session ID as the new ID.
             await asyncio.to_thread(accounts.redis.delete, accounts.prefix + "session:" + digest(old))
-        response = JSONResponse({"enabled": True, "user": user})
+        response = JSONResponse({"enabled": True, "user": {**user, "is_admin": user["id"] in config.admin_user_ids}})
         response.set_cookie(config.cookie_name, token, max_age=config.absolute_seconds,
             httponly=True, secure=config.secure_cookie, samesite="strict", path="/")
         return response
@@ -173,9 +177,24 @@ def create_gateway(config, *, accounts=None, workbenches=None):
         response.delete_cookie(config.cookie_name, path="/", secure=config.secure_cookie, httponly=True, samesite="strict")
         return response
 
+    from .usage import install_routes as install_usage
+    install_usage(app, accounts, user_for)
+    from codex_agent.knowledge.api import install_routes
+    install_routes(app, config, accounts, user_for)
+    from codex_agent.rag_catalog.api import install_routes as install_catalog
+    install_catalog(app, config, accounts, user_for)
+
     @app.api_route("/api/{path:path}", methods=["GET", "POST", "PATCH", "DELETE", "PUT"])
     async def proxy(path: str, request: Request):
         token, user = await user_for(request, mutation=request.method not in {"GET", "HEAD"})
+        # Reserved gateway namespaces must never fall through to a private
+        # workbench (or provision one) on an unknown path or wrong HTTP method.
+        if path == "admin" or path.startswith("admin/"):
+            if user["id"] not in config.admin_user_ids:
+                raise AccountError(403, "Administrator access required")
+            raise AccountError(404, "Management endpoint not found")
+        if path == "account" or path.startswith("account/"):
+            raise AccountError(404, "Account endpoint not found")
         await asyncio.to_thread(accounts.limit, "api", user["id"], 600, 60)
         entry = await asyncio.to_thread(workbenches.get, user["id"])
         if not entry["slots"].acquire(blocking=False):

@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api } from './api'
 
 function jsonResponse(value: unknown, ok = true): Response {
-  return {
-    ok,
+  return new Response(JSON.stringify(value), {
+    status: ok ? 200 : 400,
     statusText: ok ? 'OK' : 'Bad Request',
-    json: async () => value,
-  } as Response
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
 afterEach(() => {
@@ -62,7 +62,7 @@ describe('FastAPI client', () => {
   })
 
   it('persists session pinning and reads approvals across runs', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]))
+    const fetchMock = vi.fn().mockImplementation(async () => jsonResponse([]))
     vi.stubGlobal('fetch', fetchMock)
 
     await api.setSessionPinned('session-1', true)
@@ -100,7 +100,7 @@ describe('FastAPI client', () => {
 
   it('reads and cancels session-scoped parallel plans with encoded identifiers', async () => {
     const plan = { plan_id: 'plan/1', session_id: 'session/1', status: 'cancelled' }
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(plan))
+    const fetchMock = vi.fn().mockImplementation(async () => jsonResponse(plan))
     vi.stubGlobal('fetch', fetchMock)
     expect(await api.getParallelPlan('session/1', 'plan/1')).toEqual(plan)
     expect(await api.cancelParallelPlan('session/1', 'plan/1')).toEqual(plan)

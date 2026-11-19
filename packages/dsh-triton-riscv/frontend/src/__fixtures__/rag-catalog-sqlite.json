@@ -1,0 +1,735 @@
+{
+  "listing": {
+    "items": [
+      {
+        "item_id": "WyJrbm93bGVkZ2VfZG9jdW1lbnQiLCI1MDUyZGE0NWQ2YmU2NjFkNWNhNWZhOGU1M2NmNzVkNjFlMzZkZjA2ZGRmM2E3YWU2NjE4ZjNmZjQ4OGEwMWZiIiwiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiXQ.022690707a7e943de3b0372c1eff922dd9ccd9ffbab696beccf0290ea50ce132",
+        "source_kind": "knowledge_document",
+        "source_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "scope": {
+          "id": "5052da45d6be661d5ca5fa8e53cf75d61e36df06ddf3a7ae6618f3ff488a01fb",
+          "label": "shared",
+          "kind": "knowledge_document"
+        },
+        "title": "同名资料",
+        "excerpt": "最新草稿 100% 覆盖",
+        "source": "测试来源",
+        "format": "text",
+        "filename": null,
+        "latest_version": "2",
+        "serving_version": "1",
+        "content_state": "available",
+        "lifecycle_state": "active",
+        "index_state": "not_indexed",
+        "retrieval_state": "eligible",
+        "retrieval_reason": "资料当前符合配置的检索条件；不表示已在某次任务命中",
+        "cleanup_state": "not_requested",
+        "updated_at": "2026-11-11T12:00:00Z",
+        "verified_at": null,
+        "revision": "7f3637e4522ff63a7e2a0a97f1a5fffb3a4ce775a1a7195d336f87d9a7c8684e",
+        "catalog_revision": 0,
+        "chunk_count": 1,
+        "capabilities": ["view", "versions", "chunks", "delete", "edit", "index", "unpublish"]
+      },
+      {
+        "item_id": "WyJrbm93bGVkZ2VfZG9jdW1lbnQiLCI1MDUyZGE0NWQ2YmU2NjFkNWNhNWZhOGU1M2NmNzVkNjFlMzZkZjA2ZGRmM2E3YWU2NjE4ZjNmZjQ4OGEwMWZiIiwiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmIiXQ.6e7b01f3d273bde28f8573eba23148efc9a97f82723ca1ea4c08fcbac92d5e08",
+        "source_kind": "knowledge_document",
+        "source_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "scope": {
+          "id": "5052da45d6be661d5ca5fa8e53cf75d61e36df06ddf3a7ae6618f3ff488a01fb",
+          "label": "shared",
+          "kind": "knowledge_document"
+        },
+        "title": "同名资料",
+        "excerpt": "待处理文本",
+        "source": "测试来源",
+        "format": "text",
+        "filename": null,
+        "latest_version": "1",
+        "serving_version": null,
+        "content_state": "available",
+        "lifecycle_state": "active",
+        "index_state": "queued",
+        "retrieval_state": "excluded",
+        "retrieval_reason": "资料未发布、已停用或已移入回收站",
+        "cleanup_state": "not_requested",
+        "updated_at": "2026-11-11T12:00:00Z",
+        "verified_at": null,
+        "revision": "d3b363d92156829fa86d94884ee00c969b608e7b9c9054cac5fc898c1ecb17af",
+        "catalog_revision": 0,
+        "chunk_count": 1,
+        "capabilities": ["view", "versions", "chunks", "delete", "edit"]
+      },
+      {
+        "item_id": "WyJtZW1vcnlfY2FzZSIsIjgyMzQxOTZlNmU4Y2ExZDdmZTY3ZjZhMDllM2RmZDJhZGJlMjkyY2U4OGZjYmFhYmZlZDM0ODI3MzUwZDE5MTgiLCIxIl0.7c5488bdaedcdef109a586a7a8f1a7978cd7585a77b90dace0380d9ae54fde3b",
+        "source_kind": "memory_case",
+        "source_id": "1",
+        "scope": {
+          "id": "8234196e6e8ca1d7fe67f6a09e3dfd2adbe292ce88fcbaabfed34827350d1918",
+          "label": "team",
+          "kind": "memory_case"
+        },
+        "title": "同名资料 · failure-diagnosis",
+        "excerpt": "正文包含输入步长异常",
+        "source": "record-a",
+        "format": "memory",
+        "filename": null,
+        "latest_version": "1111111111111111111111111111111111111111111111111111111111111111",
+        "serving_version": "1111111111111111111111111111111111111111111111111111111111111111",
+        "content_state": "available",
+        "lifecycle_state": "active",
+        "index_state": "not_indexed",
+        "retrieval_state": "eligible",
+        "retrieval_reason": "资料当前符合配置的检索条件；不表示已在某次任务命中",
+        "cleanup_state": "not_requested",
+        "updated_at": "2026-11-11T12:00:00Z",
+        "verified_at": null,
+        "revision": "e084f4ab3efdafbc17907313e15df8740311fc4e90544d4c1c485fa62f11849f",
+        "catalog_revision": 0,
+        "chunk_count": 0,
+        "capabilities": ["view", "versions", "chunks", "correct", "archive"]
+      },
+      {
+        "item_id": "WyJtZW1vcnlfY2FzZSIsIjgyMzQxOTZlNmU4Y2ExZDdmZTY3ZjZhMDllM2RmZDJhZGJlMjkyY2U4OGZjYmFhYmZlZDM0ODI3MzUwZDE5MTgiLCIyIl0.3cf4ec3689f707f1a289f2d3910da065c200bca6f6caca561c50c8f12870273c",
+        "source_kind": "memory_case",
+        "source_id": "2",
+        "scope": {
+          "id": "8234196e6e8ca1d7fe67f6a09e3dfd2adbe292ce88fcbaabfed34827350d1918",
+          "label": "team",
+          "kind": "memory_case"
+        },
+        "title": "同名资料 · failure-diagnosis",
+        "excerpt": "正文包含输入步长异常",
+        "source": "record-a",
+        "format": "memory",
+        "filename": null,
+        "latest_version": "1111111111111111111111111111111111111111111111111111111111111111",
+        "serving_version": null,
+        "content_state": "available",
+        "lifecycle_state": "archived",
+        "index_state": "not_indexed",
+        "retrieval_state": "excluded",
+        "retrieval_reason": "资料未发布、已停用或已移入回收站",
+        "cleanup_state": "unknown",
+        "updated_at": "2026-11-11T12:00:00Z",
+        "verified_at": null,
+        "revision": "17330add4237d712d28b2fd32a2b2ec9acca710b7c909c6d9a3f255cdc0bf797",
+        "catalog_revision": 0,
+        "chunk_count": 0,
+        "capabilities": ["view", "versions", "chunks", "correct"]
+      }
+    ],
+    "total": 4,
+    "next_cursor": null,
+    "catalog_revision": "cc5a44de16eefa4da93fda72781fec968ee911237628531228882b25f498a858",
+    "complete": true,
+    "source_health": [
+      {
+        "scope_id": "5052da45d6be661d5ca5fa8e53cf75d61e36df06ddf3a7ae6618f3ff488a01fb",
+        "source_kind": "knowledge_document",
+        "status": "ready"
+      },
+      {
+        "scope_id": "8234196e6e8ca1d7fe67f6a09e3dfd2adbe292ce88fcbaabfed34827350d1918",
+        "source_kind": "memory_case",
+        "status": "ready"
+      }
+    ],
+    "scopes": [
+      {
+        "id": "5052da45d6be661d5ca5fa8e53cf75d61e36df06ddf3a7ae6618f3ff488a01fb",
+        "label": "shared",
+        "kind": "knowledge_document"
+      },
+      {
+        "id": "8234196e6e8ca1d7fe67f6a09e3dfd2adbe292ce88fcbaabfed34827350d1918",
+        "label": "team",
+        "kind": "memory_case"
+      }
+    ],
+    "as_of": "2026-11-11T15:43:29.146100+00:00"
+  },
+  "summary": {
+    "total": 4,
+    "eligible": 2,
+    "pending": 2,
+    "attention": 0,
+    "excluded": 2,
+    "complete": true,
+    "source_health": [
+      {
+        "scope_id": "5052da45d6be661d5ca5fa8e53cf75d61e36df06ddf3a7ae6618f3ff488a01fb",
+        "source_kind": "knowledge_document",
+        "status": "ready"
+      },
+      {
+        "scope_id": "8234196e6e8ca1d7fe67f6a09e3dfd2adbe292ce88fcbaabfed34827350d1918",
+        "source_kind": "memory_case",
+        "status": "ready"
+      }
+    ],
+    "scopes": [
+      {
+        "id": "5052da45d6be661d5ca5fa8e53cf75d61e36df06ddf3a7ae6618f3ff488a01fb",
+        "label": "shared",
+        "kind": "knowledge_document"
+      },
+      {
+        "id": "8234196e6e8ca1d7fe67f6a09e3dfd2adbe292ce88fcbaabfed34827350d1918",
+        "label": "team",
+        "kind": "memory_case"
+      }
+    ],
+    "catalog_revision": "cc5a44de16eefa4da93fda72781fec968ee911237628531228882b25f498a858",
+    "as_of": "2026-11-11T15:43:29.177467+00:00"
+  },
+  "records": {
+    "WyJrbm93bGVkZ2VfZG9jdW1lbnQiLCI1MDUyZGE0NWQ2YmU2NjFkNWNhNWZhOGU1M2NmNzVkNjFlMzZkZjA2ZGRmM2E3YWU2NjE4ZjNmZjQ4OGEwMWZiIiwiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiXQ.022690707a7e943de3b0372c1eff922dd9ccd9ffbab696beccf0290ea50ce132": {
+      "detail": {
+        "item_id": "WyJrbm93bGVkZ2VfZG9jdW1lbnQiLCI1MDUyZGE0NWQ2YmU2NjFkNWNhNWZhOGU1M2NmNzVkNjFlMzZkZjA2ZGRmM2E3YWU2NjE4ZjNmZjQ4OGEwMWZiIiwiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWEiXQ.022690707a7e943de3b0372c1eff922dd9ccd9ffbab696beccf0290ea50ce132",
+        "source_kind": "knowledge_document",
+        "source_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "scope": {
+          "id": "5052da45d6be661d5ca5fa8e53cf75d61e36df06ddf3a7ae6618f3ff488a01fb",
+          "label": "shared",
+          "kind": "knowledge_document"
+        },
+        "title": "同名资料",
+        "excerpt": "最新草稿 100% 覆盖",
+        "source": "测试来源",
+        "format": "text",
+        "filename": null,
+        "latest_version": "2",
+        "serving_version": "1",
+        "content_state": "available",
+        "lifecycle_state": "active",
+        "index_state": "not_indexed",
+        "retrieval_state": "eligible",
+        "retrieval_reason": "资料当前符合配置的检索条件；不表示已在某次任务命中",
+        "cleanup_state": "not_requested",
+        "updated_at": "2026-11-11T12:00:00Z",
+        "verified_at": null,
+        "revision": "7f3637e4522ff63a7e2a0a97f1a5fffb3a4ce775a1a7195d336f87d9a7c8684e",
+        "catalog_revision": 0,
+        "chunk_count": 1,
+        "capabilities": ["view", "versions", "chunks", "delete", "edit", "index", "unpublish"],
+        "selected_version": "1",
+        "selected_title": "同名资料",
+        "selected_source": "测试来源",
+        "content": "旧版正文 保留原句",
+        "sections": [
+          {
+            "id": "s1",
+            "label": "第1页",
+            "text": "旧版正文 保留原句",
+            "locator": "第1页"
+          }
+        ],
+        "source_file": {
+          "filename": "missing-original.pdf",
+          "format": "pdf",
+          "sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "parser_version": "fixture",
+          "reviewed": true,
+          "warnings": [],
+          "download_available": false
+        },
+        "provenance": {
+          "source_kind": "knowledge_document",
+          "source_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source": "测试来源",
+          "original_file_available": false
+        }
+      },
+      "versions": {
+        "items": [
+          {
+            "version": "2",
+            "state": "draft",
+            "chunk_count": 1,
+            "created_at": "2026-11-11T12:00:00Z",
+            "is_latest": true,
+            "is_serving": false
+          },
+          {
+            "version": "1",
+            "state": "ready",
+            "chunk_count": 1,
+            "created_at": "2026-11-11T12:00:00Z",
+            "is_latest": false,
+            "is_serving": true
+          }
+        ],
+        "next_cursor": null,
+        "version": null,
+        "catalog_revision": "cc5a44de16eefa4da93fda72781fec968ee911237628531228882b25f498a858"
+      },
+      "chunks": {
+        "1": {
+          "items": [
+            {
+              "id": "chunk-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1",
+              "text": "片段 1",
+              "position": 0,
+              "locator": ""
+            }
+          ],
+          "next_cursor": null,
+          "version": "1",
+          "catalog_revision": "cc5a44de16eefa4da93fda72781fec968ee911237628531228882b25f498a858"
+        }
+      }
+    },
+    "WyJrbm93bGVkZ2VfZG9jdW1lbnQiLCI1MDUyZGE0NWQ2YmU2NjFkNWNhNWZhOGU1M2NmNzVkNjFlMzZkZjA2ZGRmM2E3YWU2NjE4ZjNmZjQ4OGEwMWZiIiwiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmIiXQ.6e7b01f3d273bde28f8573eba23148efc9a97f82723ca1ea4c08fcbac92d5e08": {
+      "detail": {
+        "item_id": "WyJrbm93bGVkZ2VfZG9jdW1lbnQiLCI1MDUyZGE0NWQ2YmU2NjFkNWNhNWZhOGU1M2NmNzVkNjFlMzZkZjA2ZGRmM2E3YWU2NjE4ZjNmZjQ4OGEwMWZiIiwiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmIiXQ.6e7b01f3d273bde28f8573eba23148efc9a97f82723ca1ea4c08fcbac92d5e08",
+        "source_kind": "knowledge_document",
+        "source_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "scope": {
+          "id": "5052da45d6be661d5ca5fa8e53cf75d61e36df06ddf3a7ae6618f3ff488a01fb",
+          "label": "shared",
+          "kind": "knowledge_document"
+        },
+        "title": "同名资料",
+        "excerpt": "待处理文本",
+        "source": "测试来源",
+        "format": "text",
+        "filename": null,
+        "latest_version": "1",
+        "serving_version": null,
+        "content_state": "available",
+        "lifecycle_state": "active",
+        "index_state": "queued",
+        "retrieval_state": "excluded",
+        "retrieval_reason": "资料未发布、已停用或已移入回收站",
+        "cleanup_state": "not_requested",
+        "updated_at": "2026-11-11T12:00:00Z",
+        "verified_at": null,
+        "revision": "d3b363d92156829fa86d94884ee00c969b608e7b9c9054cac5fc898c1ecb17af",
+        "catalog_revision": 0,
+        "chunk_count": 1,
+        "capabilities": ["view", "versions", "chunks", "delete", "edit"],
+        "selected_version": "1",
+        "selected_title": "同名资料",
+        "selected_source": "测试来源",
+        "content": "待处理文本",
+        "sections": [
+          {
+            "id": "content",
+            "label": "原文",
+            "text": "待处理文本",
+            "locator": ""
+          }
+        ],
+        "source_file": null,
+        "provenance": {
+          "source_kind": "knowledge_document",
+          "source_id": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source": "测试来源",
+          "original_file_available": null
+        }
+      },
+      "versions": {
+        "items": [
+          {
+            "version": "1",
+            "state": "pending",
+            "chunk_count": 1,
+            "created_at": "2026-11-11T12:00:00Z",
+            "is_latest": true,
+            "is_serving": false
+          }
+        ],
+        "next_cursor": null,
+        "version": null,
+        "catalog_revision": "cc5a44de16eefa4da93fda72781fec968ee911237628531228882b25f498a858"
+      },
+      "chunks": {
+        "1": {
+          "items": [
+            {
+              "id": "chunk-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-1",
+              "text": "片段 1",
+              "position": 0,
+              "locator": ""
+            }
+          ],
+          "next_cursor": null,
+          "version": "1",
+          "catalog_revision": "cc5a44de16eefa4da93fda72781fec968ee911237628531228882b25f498a858"
+        }
+      }
+    },
+    "WyJtZW1vcnlfY2FzZSIsIjgyMzQxOTZlNmU4Y2ExZDdmZTY3ZjZhMDllM2RmZDJhZGJlMjkyY2U4OGZjYmFhYmZlZDM0ODI3MzUwZDE5MTgiLCIxIl0.7c5488bdaedcdef109a586a7a8f1a7978cd7585a77b90dace0380d9ae54fde3b": {
+      "detail": {
+        "item_id": "WyJtZW1vcnlfY2FzZSIsIjgyMzQxOTZlNmU4Y2ExZDdmZTY3ZjZhMDllM2RmZDJhZGJlMjkyY2U4OGZjYmFhYmZlZDM0ODI3MzUwZDE5MTgiLCIxIl0.7c5488bdaedcdef109a586a7a8f1a7978cd7585a77b90dace0380d9ae54fde3b",
+        "source_kind": "memory_case",
+        "source_id": "1",
+        "scope": {
+          "id": "8234196e6e8ca1d7fe67f6a09e3dfd2adbe292ce88fcbaabfed34827350d1918",
+          "label": "team",
+          "kind": "memory_case"
+        },
+        "title": "同名资料 · failure-diagnosis",
+        "excerpt": "正文包含输入步长异常",
+        "source": "record-a",
+        "format": "memory",
+        "filename": null,
+        "latest_version": "1111111111111111111111111111111111111111111111111111111111111111",
+        "serving_version": "1111111111111111111111111111111111111111111111111111111111111111",
+        "content_state": "available",
+        "lifecycle_state": "active",
+        "index_state": "not_indexed",
+        "retrieval_state": "eligible",
+        "retrieval_reason": "资料当前符合配置的检索条件；不表示已在某次任务命中",
+        "cleanup_state": "not_requested",
+        "updated_at": "2026-11-11T12:00:00Z",
+        "verified_at": null,
+        "revision": "e084f4ab3efdafbc17907313e15df8740311fc4e90544d4c1c485fa62f11849f",
+        "catalog_revision": 0,
+        "chunk_count": 0,
+        "capabilities": ["view", "versions", "chunks", "correct", "archive"],
+        "selected_version": "1111111111111111111111111111111111111111111111111111111111111111",
+        "selected_title": "同名资料 · failure-diagnosis",
+        "selected_source": "record-a",
+        "content": "问题与语义\n输入步长异常\n\n参考代码\nreference(x)\n\n处理记录\n已检查输入步长\n\n错误信息\nshape\n\n记录中的结果\nfailed\n\n原始证据记录\n{\n  \"summary\": \"记录证据\"\n}",
+        "sections": [
+          {
+            "id": "semantics",
+            "label": "问题与语义",
+            "text": "输入步长异常",
+            "locator": "semantics"
+          },
+          {
+            "id": "pytorch_reference",
+            "label": "参考代码",
+            "text": "reference(x)",
+            "locator": "pytorch_reference"
+          },
+          {
+            "id": "summary",
+            "label": "处理记录",
+            "text": "已检查输入步长",
+            "locator": "summary"
+          },
+          {
+            "id": "error_signature",
+            "label": "错误信息",
+            "text": "shape",
+            "locator": "error_signature"
+          },
+          {
+            "id": "outcome",
+            "label": "记录中的结果",
+            "text": "failed",
+            "locator": "outcome"
+          },
+          {
+            "id": "evidence",
+            "label": "原始证据记录",
+            "text": "{\n  \"summary\": \"记录证据\"\n}",
+            "locator": "evidence"
+          }
+        ],
+        "source_file": null,
+        "provenance": {
+          "source_kind": "memory_case",
+          "source_id": "1",
+          "source_run": "record-a",
+          "confidence_grade": "C",
+          "evidence_status": "原始记录中的结果，不代表管理员已重新验证"
+        }
+      },
+      "versions": {
+        "items": [
+          {
+            "version": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "recorded",
+            "chunk_count": 0,
+            "created_at": "2026-11-11T12:00:00Z",
+            "is_latest": true,
+            "is_serving": true
+          },
+          {
+            "version": "2222222222222222222222222222222222222222222222222222222222222222",
+            "state": "recorded",
+            "chunk_count": 0,
+            "created_at": "2026-11-11T12:00:00Z",
+            "is_latest": false,
+            "is_serving": false
+          }
+        ],
+        "next_cursor": null,
+        "version": null,
+        "catalog_revision": "cc5a44de16eefa4da93fda72781fec968ee911237628531228882b25f498a858"
+      },
+      "chunks": {
+        "1111111111111111111111111111111111111111111111111111111111111111": {
+          "items": [
+            {
+              "id": "m-1",
+              "text": "当前记忆片段",
+              "position": 0,
+              "locator": "summary"
+            }
+          ],
+          "next_cursor": null,
+          "version": "1111111111111111111111111111111111111111111111111111111111111111",
+          "catalog_revision": "cc5a44de16eefa4da93fda72781fec968ee911237628531228882b25f498a858"
+        }
+      },
+      "history": {
+        "item_id": "WyJtZW1vcnlfY2FzZSIsIjgyMzQxOTZlNmU4Y2ExZDdmZTY3ZjZhMDllM2RmZDJhZGJlMjkyY2U4OGZjYmFhYmZlZDM0ODI3MzUwZDE5MTgiLCIxIl0.7c5488bdaedcdef109a586a7a8f1a7978cd7585a77b90dace0380d9ae54fde3b",
+        "source_kind": "memory_case",
+        "source_id": "1",
+        "scope": {
+          "id": "8234196e6e8ca1d7fe67f6a09e3dfd2adbe292ce88fcbaabfed34827350d1918",
+          "label": "team",
+          "kind": "memory_case"
+        },
+        "title": "同名资料 · failure-diagnosis",
+        "excerpt": "正文包含输入步长异常",
+        "source": "record-a",
+        "format": "memory",
+        "filename": null,
+        "latest_version": "1111111111111111111111111111111111111111111111111111111111111111",
+        "serving_version": "1111111111111111111111111111111111111111111111111111111111111111",
+        "content_state": "available",
+        "lifecycle_state": "active",
+        "index_state": "not_indexed",
+        "retrieval_state": "eligible",
+        "retrieval_reason": "资料当前符合配置的检索条件；不表示已在某次任务命中",
+        "cleanup_state": "not_requested",
+        "updated_at": "2026-11-11T12:00:00Z",
+        "verified_at": null,
+        "revision": "e084f4ab3efdafbc17907313e15df8740311fc4e90544d4c1c485fa62f11849f",
+        "catalog_revision": 0,
+        "chunk_count": 0,
+        "capabilities": ["view", "versions", "chunks", "correct", "archive"],
+        "selected_version": "2222222222222222222222222222222222222222222222222222222222222222",
+        "selected_title": "同名资料 · failure-diagnosis",
+        "selected_source": "record-a",
+        "content": "问题与语义\n旧记忆\n\n处理记录\n原始记录\n\n记录中的结果\nfailed\n\n原始证据记录\n{\n  \"summary\": \"快照\"\n}",
+        "sections": [
+          {
+            "id": "semantics",
+            "label": "问题与语义",
+            "text": "旧记忆",
+            "locator": "semantics"
+          },
+          {
+            "id": "summary",
+            "label": "处理记录",
+            "text": "原始记录",
+            "locator": "summary"
+          },
+          {
+            "id": "outcome",
+            "label": "记录中的结果",
+            "text": "failed",
+            "locator": "outcome"
+          },
+          {
+            "id": "evidence",
+            "label": "原始证据记录",
+            "text": "{\n  \"summary\": \"快照\"\n}",
+            "locator": "evidence"
+          }
+        ],
+        "source_file": null,
+        "provenance": {
+          "source_kind": "memory_case",
+          "source_id": "1",
+          "source_run": "record-a",
+          "confidence_grade": null,
+          "evidence_status": "原始记录中的结果，不代表管理员已重新验证"
+        }
+      }
+    },
+    "WyJtZW1vcnlfY2FzZSIsIjgyMzQxOTZlNmU4Y2ExZDdmZTY3ZjZhMDllM2RmZDJhZGJlMjkyY2U4OGZjYmFhYmZlZDM0ODI3MzUwZDE5MTgiLCIyIl0.3cf4ec3689f707f1a289f2d3910da065c200bca6f6caca561c50c8f12870273c": {
+      "detail": {
+        "item_id": "WyJtZW1vcnlfY2FzZSIsIjgyMzQxOTZlNmU4Y2ExZDdmZTY3ZjZhMDllM2RmZDJhZGJlMjkyY2U4OGZjYmFhYmZlZDM0ODI3MzUwZDE5MTgiLCIyIl0.3cf4ec3689f707f1a289f2d3910da065c200bca6f6caca561c50c8f12870273c",
+        "source_kind": "memory_case",
+        "source_id": "2",
+        "scope": {
+          "id": "8234196e6e8ca1d7fe67f6a09e3dfd2adbe292ce88fcbaabfed34827350d1918",
+          "label": "team",
+          "kind": "memory_case"
+        },
+        "title": "同名资料 · failure-diagnosis",
+        "excerpt": "正文包含输入步长异常",
+        "source": "record-a",
+        "format": "memory",
+        "filename": null,
+        "latest_version": "1111111111111111111111111111111111111111111111111111111111111111",
+        "serving_version": null,
+        "content_state": "available",
+        "lifecycle_state": "archived",
+        "index_state": "not_indexed",
+        "retrieval_state": "excluded",
+        "retrieval_reason": "资料未发布、已停用或已移入回收站",
+        "cleanup_state": "unknown",
+        "updated_at": "2026-11-11T12:00:00Z",
+        "verified_at": null,
+        "revision": "17330add4237d712d28b2fd32a2b2ec9acca710b7c909c6d9a3f255cdc0bf797",
+        "catalog_revision": 0,
+        "chunk_count": 0,
+        "capabilities": ["view", "versions", "chunks", "correct"],
+        "selected_version": "1111111111111111111111111111111111111111111111111111111111111111",
+        "selected_title": "同名资料 · failure-diagnosis",
+        "selected_source": "record-a",
+        "content": "问题与语义\n输入步长异常\n\n参考代码\nreference(x)\n\n处理记录\n已检查输入步长\n\n错误信息\nshape\n\n记录中的结果\nfailed\n\n原始证据记录\n{\n  \"summary\": \"记录证据\"\n}",
+        "sections": [
+          {
+            "id": "semantics",
+            "label": "问题与语义",
+            "text": "输入步长异常",
+            "locator": "semantics"
+          },
+          {
+            "id": "pytorch_reference",
+            "label": "参考代码",
+            "text": "reference(x)",
+            "locator": "pytorch_reference"
+          },
+          {
+            "id": "summary",
+            "label": "处理记录",
+            "text": "已检查输入步长",
+            "locator": "summary"
+          },
+          {
+            "id": "error_signature",
+            "label": "错误信息",
+            "text": "shape",
+            "locator": "error_signature"
+          },
+          {
+            "id": "outcome",
+            "label": "记录中的结果",
+            "text": "failed",
+            "locator": "outcome"
+          },
+          {
+            "id": "evidence",
+            "label": "原始证据记录",
+            "text": "{\n  \"summary\": \"记录证据\"\n}",
+            "locator": "evidence"
+          }
+        ],
+        "source_file": null,
+        "provenance": {
+          "source_kind": "memory_case",
+          "source_id": "2",
+          "source_run": "record-a",
+          "confidence_grade": "C",
+          "evidence_status": "原始记录中的结果，不代表管理员已重新验证"
+        }
+      },
+      "versions": {
+        "items": [
+          {
+            "version": "1111111111111111111111111111111111111111111111111111111111111111",
+            "state": "recorded",
+            "chunk_count": 0,
+            "created_at": "2026-11-11T12:00:00Z",
+            "is_latest": true,
+            "is_serving": false
+          },
+          {
+            "version": "2222222222222222222222222222222222222222222222222222222222222222",
+            "state": "recorded",
+            "chunk_count": 0,
+            "created_at": "2026-11-11T12:00:00Z",
+            "is_latest": false,
+            "is_serving": false
+          }
+        ],
+        "next_cursor": null,
+        "version": null,
+        "catalog_revision": "cc5a44de16eefa4da93fda72781fec968ee911237628531228882b25f498a858"
+      },
+      "chunks": {
+        "1111111111111111111111111111111111111111111111111111111111111111": {
+          "items": [
+            {
+              "id": "m-2",
+              "text": "当前记忆片段",
+              "position": 0,
+              "locator": "summary"
+            }
+          ],
+          "next_cursor": null,
+          "version": "1111111111111111111111111111111111111111111111111111111111111111",
+          "catalog_revision": "cc5a44de16eefa4da93fda72781fec968ee911237628531228882b25f498a858"
+        }
+      },
+      "history": {
+        "item_id": "WyJtZW1vcnlfY2FzZSIsIjgyMzQxOTZlNmU4Y2ExZDdmZTY3ZjZhMDllM2RmZDJhZGJlMjkyY2U4OGZjYmFhYmZlZDM0ODI3MzUwZDE5MTgiLCIyIl0.3cf4ec3689f707f1a289f2d3910da065c200bca6f6caca561c50c8f12870273c",
+        "source_kind": "memory_case",
+        "source_id": "2",
+        "scope": {
+          "id": "8234196e6e8ca1d7fe67f6a09e3dfd2adbe292ce88fcbaabfed34827350d1918",
+          "label": "team",
+          "kind": "memory_case"
+        },
+        "title": "同名资料 · failure-diagnosis",
+        "excerpt": "正文包含输入步长异常",
+        "source": "record-a",
+        "format": "memory",
+        "filename": null,
+        "latest_version": "1111111111111111111111111111111111111111111111111111111111111111",
+        "serving_version": null,
+        "content_state": "available",
+        "lifecycle_state": "archived",
+        "index_state": "not_indexed",
+        "retrieval_state": "excluded",
+        "retrieval_reason": "资料未发布、已停用或已移入回收站",
+        "cleanup_state": "unknown",
+        "updated_at": "2026-11-11T12:00:00Z",
+        "verified_at": null,
+        "revision": "17330add4237d712d28b2fd32a2b2ec9acca710b7c909c6d9a3f255cdc0bf797",
+        "catalog_revision": 0,
+        "chunk_count": 0,
+        "capabilities": ["view", "versions", "chunks", "correct"],
+        "selected_version": "2222222222222222222222222222222222222222222222222222222222222222",
+        "selected_title": "同名资料 · failure-diagnosis",
+        "selected_source": "record-a",
+        "content": "问题与语义\n旧记忆\n\n处理记录\n原始记录\n\n记录中的结果\nfailed\n\n原始证据记录\n{\n  \"summary\": \"快照\"\n}",
+        "sections": [
+          {
+            "id": "semantics",
+            "label": "问题与语义",
+            "text": "旧记忆",
+            "locator": "semantics"
+          },
+          {
+            "id": "summary",
+            "label": "处理记录",
+            "text": "原始记录",
+            "locator": "summary"
+          },
+          {
+            "id": "outcome",
+            "label": "记录中的结果",
+            "text": "failed",
+            "locator": "outcome"
+          },
+          {
+            "id": "evidence",
+            "label": "原始证据记录",
+            "text": "{\n  \"summary\": \"快照\"\n}",
+            "locator": "evidence"
+          }
+        ],
+        "source_file": null,
+        "provenance": {
+          "source_kind": "memory_case",
+          "source_id": "2",
+          "source_run": "record-a",
+          "confidence_grade": null,
+          "evidence_status": "原始记录中的结果，不代表管理员已重新验证"
+        }
+      }
+    }
+  }
+}

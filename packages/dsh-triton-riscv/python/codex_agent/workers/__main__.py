@@ -15,7 +15,7 @@ from .consumer import execute_delivery
 async def serve(args):
     root = args.workspace.resolve()
     config = runtime_config()
-    enabled = config.indexing.enabled if args.role == "index" else config.queue.enabled
+    enabled = (config.indexing.enabled or config.queue.enabled) if args.role == "index" else config.queue.enabled
     if args.role in {"relay", "recover", "execute", "reconcile"}:
         enabled = config.queue.enabled or config.indexing.enabled
     if not enabled or (config.repoRoot and Path(config.repoRoot).resolve() != root):

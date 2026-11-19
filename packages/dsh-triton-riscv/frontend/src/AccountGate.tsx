@@ -1,6 +1,8 @@
-import { KeyRound, LogOut, UserRound, X } from 'lucide-react'
+import { Activity, KeyRound, LogOut, ShieldCheck, UserRound, X } from 'lucide-react'
 import { FormEvent, ReactNode, useEffect, useRef, useState } from 'react'
 import { AccountUser, authFetch, authRequest, setAccount } from './auth'
+import { AdminDashboard } from './AdminDashboard'
+import { UsageDashboard } from './UsageDashboard'
 import './account.css'
 
 export function AccountGate({ children }: { children: ReactNode }) {
@@ -11,6 +13,11 @@ export function AccountGate({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState(false)
   const [passwordDialog, setPasswordDialog] = useState(false)
   const [notice, setNotice] = useState('')
+  const [adminIdentity, setAdminIdentity] = useState<string | null>(null)
+  const [usageIdentity, setUsageIdentity] = useState<string | null>(null)
+  const identity = user ? `${user.id}:${user.csrf_token}` : null
+  const adminOpen = user?.is_admin === true && adminIdentity !== null && adminIdentity === identity
+  const usageOpen = !!user && !adminOpen && usageIdentity !== null && usageIdentity === identity
   const generation = useRef(0)
   const authPending = useRef(false)
   const accountChannel = useRef<BroadcastChannel | null>(null)
@@ -22,8 +29,15 @@ export function AccountGate({ children }: { children: ReactNode }) {
     setAccount(null)
     setUser(null)
     setPasswordDialog(false)
+    setAdminIdentity(null)
+    setUsageIdentity(null)
     setState('login')
   }
+  useEffect(() => {
+    // A valid click can precede this effect; discard only an obsolete identity.
+    setAdminIdentity(current => user?.is_admin === true && current === identity ? current : null)
+    setUsageIdentity(current => current === identity ? current : null)
+  }, [identity, user?.is_admin])
   async function check() {
     if (authPending.current) return
     const version = ++generation.current
@@ -262,6 +276,27 @@ export function AccountGate({ children }: { children: ReactNode }) {
               {error}
             </span>
           )}
+          {user.is_admin === true && (
+            <button
+              className="account-nav-button"
+              title={adminOpen ? '已在管理后台，请使用页面内的返回对话按钮离开' : '管理后台'}
+              aria-label="管理后台"
+              aria-expanded={adminOpen}
+              disabled={adminOpen}
+              onClick={() => { if (!adminOpen) { setUsageIdentity(null); setAdminIdentity(identity) } }}
+            >
+              <ShieldCheck size={17} />
+              <span>管理后台</span>
+            </button>
+          )}
+          <button
+            className="account-nav-button"
+            title={adminOpen ? '请先从管理后台返回对话，再查看个人使用情况' : '我的使用情况'}
+            aria-label="我的使用情况"
+            aria-expanded={usageOpen}
+            disabled={adminOpen}
+            onClick={() => setUsageIdentity(usageOpen ? null : identity)}
+          ><Activity size={17} /><span>我的使用情况</span></button>
           <button
             className="icon-button"
             title="修改密码"
@@ -285,7 +320,9 @@ export function AccountGate({ children }: { children: ReactNode }) {
           </button>
         </div>
       )}
-      <div key={user?.id || 'local'}>{children}</div>
+      <div key={user?.id || 'local'} hidden={adminOpen || usageOpen}>{children}</div>
+      {adminOpen && <AdminDashboard key={identity} onClose={() => setAdminIdentity(null)} />}
+      {usageOpen && user && <UsageDashboard key={identity} accountId={user.id} onClose={() => setUsageIdentity(null)} />}
       {passwordDialog && (
         <div className="account-overlay">
           <section className="account-form" role="dialog" aria-modal="true" aria-labelledby="password-title">

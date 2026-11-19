@@ -24,7 +24,7 @@ describe('workflow parallel decisions', () => {
       parallel_plan: { plan_id: 'plan-one', digest: 'reviewed-digest' },
     } as Workflow
     const updated = { ...task, revision: 8, state: 'preparing' }
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => updated })
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(updated))
     vi.stubGlobal('fetch', fetchMock)
     setAccount({ id: 'account-one', username: 'reviewer', csrf_token: 'csrf-one' })
 
@@ -49,7 +49,7 @@ describe('workflow parallel decisions', () => {
   })
 
   it.each(['stale workflow revision', 'digest mismatch'])('surfaces %s without retrying', async detail => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 409, json: async () => ({ detail }) })
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ detail }, { status: 409 }))
     vi.stubGlobal('fetch', fetchMock)
     const task = {
       id: 'workflow-one',

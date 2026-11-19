@@ -129,6 +129,14 @@ registration, login and private per-account workspaces. Native Harness login is 
 Passwords require 6 to 128 characters. This is a trusted-workbench policy, not a
 recommendation for public deployment; use strong, unique passwords.
 
+The optional [admin knowledge library](python/codex_agent/README.md#admin-knowledge-library)
+adds account usage totals, document/OCR review, shared RAG editing and search preview.
+
+**我的使用情况** shows the signed-in account's retained session/run counts and recent
+statuses, without message content or billing claims. Administrators can see aggregate
+account usage in **管理后台 → 账号概览**. Ordinary users cannot access management APIs.
+Published documents enrich workbench chat; private operator history stays separate.
+
 ### Optional Redis Cache
 
 Use a private standalone Redis with a memory limit and `maxmemory-policy noeviction`.
@@ -175,3 +183,51 @@ pnpm test:all
 ```
 
 For trusted local use only. Never commit credentials. Backend development commands are in [python/codex_agent/README.md](python/codex_agent/README.md).
+
+### Shared Knowledge Administration
+
+Enable the [admin knowledge library](python/codex_agent/README.md#admin-knowledge-library)
+in the account gateway. Native Harness login and UI are unchanged.
+
+1. Open **管理后台 → RAG 资料** to browse shared originals, versions and readable chunks.
+2. Select **管理 / 编辑此文档**, or use **文档管理** to add text, PDF, DOCX or PNG/JPEG files.
+3. Review extracted text, then choose **确认加入共享 RAG / 确认修改并更新 RAG**.
+4. Wait for **已发布到共享 RAG**. Saving a draft alone does not publish it.
+
+Confirmation queues indexing and publishes only the confirmed version after success.
+Failed updates retain the previous published version. After a timeout, check the
+operation receipt or retry the same request; do not submit another update blindly.
+Deletion immediately unpublishes the document and queues scoped vector cleanup.
+The recycle bin retains originals; restoration does not automatically republish them.
+
+**资料分类** groups shared copies by origin. **实际向量** checks the selected version's
+Qdrant count against its index record; an unavailable service is not an empty index.
+This is not a global Qdrant console and does not enumerate other collections or users.
+
+#### Optional Historical Sources
+
+Register old databases in the private account config under `rag_history_sources`:
+
+```json
+{
+  "id": "legacy",
+  "label": "Legacy operator reports",
+  "url_env": "TRITON_RAG_HISTORY_LEGACY_URL",
+  "workspace_ids": ["CANONICAL_64_CHARACTER_WORKSPACE_ID"],
+  "memory_mode": "qdrant",
+  "allow_share": true,
+  "vector_url": "http://127.0.0.1:6333"
+}
+```
+
+Use a read-only MySQL account and keep its URL in the named environment variable.
+Account-owned sources also require their active `owner_user_id`. Optional vector
+authentication uses `vector_api_key_env` with a `TRITON_RAG_HISTORY_` prefix.
+Historical originals stay read-only. **加入共享知识库** creates a draft copy;
+**编辑共享版本** edits that copy without overwriting the original.
+Only explicit confirmation publishes it to shared retrieval.
+
+Private workspaces are excluded from the current shared catalog. The old
+`rag_workspace_ids` field is accepted for compatibility but no longer grants catalog
+access. Use explicit historical sources instead; their credentials are not passed
+to ordinary user workbenches or knowledge workers.

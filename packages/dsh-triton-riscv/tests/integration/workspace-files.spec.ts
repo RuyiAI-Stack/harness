@@ -77,7 +77,8 @@ with tempfile.TemporaryDirectory() as folder:
         async def monitor(self):
             await asyncio.sleep(3600)
         def get(self, uid): return {'socket':uid, 'key':'fixture', 'slots':threading.BoundedSemaphore(4)}
-    config = SimpleNamespace(origin='http://testserver', cookie_name='session', secure_cookie=False)
+    config = SimpleNamespace(origin='http://testserver', cookie_name='session', secure_cookie=False,
+        data_dir=base / 'accounts', admin_user_ids=(), knowledge_enabled=False)
     gateway = create_gateway(config, accounts=Accounts(), workbenches=Workbenches())
     original_client = httpx.AsyncClient
     def private_client(*args, **kw):

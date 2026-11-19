@@ -562,8 +562,15 @@ class HarnessRunExecutor:
         try:
             from codex_agent.harness.delegation import host_scope
             with host_scope(run["session_id"], run_id, request["task"]):
-                result = self.agent.run(
+                from codex_agent.knowledge.vectors import augment_chat
+                task, knowledge = augment_chat(
                     self._managed_task(run) if self.agent.settings.managed_context else request["task"],
+                    request["task"],
+                )
+                if knowledge["status"] != "disabled":
+                    self.store.add_event(run_id, "knowledge-context", knowledge)
+                result = self.agent.run(
+                    task,
                     session_id=request["harness_session_id"], on_event=record_event,
                 )
             publish_parallel_plans()

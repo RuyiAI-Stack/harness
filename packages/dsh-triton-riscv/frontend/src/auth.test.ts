@@ -77,6 +77,24 @@ it('keeps responses valid for routine identity refreshes but invalidates rotated
   await expect(old.json()).rejects.toMatchObject({ name: 'AbortError' })
 })
 
+it('discards a private image body if the account changes during download', async () => {
+  setAccount(alice)
+  const old = response()
+  let resolve!: (body: Blob) => void
+  vi.spyOn(old, 'blob').mockImplementation(
+    () =>
+      new Promise(done => {
+        resolve = done
+      }),
+  )
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(old))
+  const body = (await authFetch('/api/admin/knowledge/a/preview?version=1')).blob()
+  const rejected = expect(body).rejects.toMatchObject({ name: 'AbortError' })
+  setAccount(bob)
+  resolve(new Blob(['private image']))
+  await rejected
+})
+
 it('binds EventSource to an account without exposing CSRF or cookie secrets in the URL', () => {
   const path = '/api/runs/run-a/events/stream?after=5'
   expect(accountStreamUrl(path)).toBe(path)

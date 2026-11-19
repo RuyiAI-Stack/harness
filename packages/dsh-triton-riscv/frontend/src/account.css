@@ -17,12 +17,24 @@
 .account-shell .app-shell { height: calc(100dvh - 42px); }
 .account-bar { height: 42px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 3px 18px; background: #202328; color: #e5e7eb; border-bottom: 1px solid #383d46; box-sizing: border-box; }
 .account-bar > span:first-child { display: flex; gap: 8px; align-items: center; font-size: 13px; overflow-wrap: anywhere; }
+.account-bar > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.account-bar > span:first-child svg { flex-shrink: 0; }
+.account-nav-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 5px 9px; border: 1px solid transparent; border-radius: 5px; color: #c5d9d2; background: transparent; font-size: 12px; line-height: 18px; white-space: nowrap; }
+.account-nav-button:hover, .account-nav-button[aria-expanded='true'] { background: #2c3935; border-color: #496158; }
+.account-nav-button:disabled { opacity: .45; cursor: not-allowed; }
 .account-bar .icon-button { width: 30px; height: 30px; color: #b8d5c9; }
 .account-bar > .account-error { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .account-overlay { position: fixed; inset: 0; background: #000a; display: grid; place-items: center; z-index: 100; padding: 24px; }
 .account-overlay .account-form { background: #22252a; border: 1px solid #454a53; border-radius: 8px; padding: 24px; max-height: calc(100dvh - 48px); overflow: auto; }
 .account-dialog-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 @media (max-width: 600px) { .account-page { padding: 20px; } .account-bar { padding-inline: 10px; } }
+@media (max-width: 480px) {
+  .account-bar { gap: 4px; padding-inline: 7px; }
+  .account-nav-button { padding-inline: 5px; gap: 4px; }
+  .account-nav-button > svg { display: none; }
+  .account-bar > span:first-child { font-size: 12px; margin-right: auto; }
+  .account-bar .icon-button { flex-shrink: 0; }
+}
 @media (max-width: 900px) {
   .account-shell .sessions-panel, .account-shell .inspector-panel { top: 114px; }
   .account-shell .scrim { top: 114px; }

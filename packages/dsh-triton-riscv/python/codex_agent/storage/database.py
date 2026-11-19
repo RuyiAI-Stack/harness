@@ -107,27 +107,46 @@ class WorkspaceDatabase:
 
     def insert(self, conn, table, values):
         conn.execute(table.insert().values(**{**values, "workspace_id": self.workspace_id}))
-        self._changed(conn, table)
+        self._changed(conn, table, values=values)
 
     def update(self, conn, table, values, *conditions):
         result = conn.execute(update(table).where(*self.predicate(table, *conditions)).values(**values))
         if result.rowcount and set(values) != {"last_used_at"}:
-            self._changed(conn, table)
+            self._changed(conn, table, values=values, conditions=conditions)
         return result
 
     def delete(self, conn, table, *conditions):
+        index_job = table.name != "jobs" or conn.execute(select(table.c.id).where(
+            *self.predicate(table, *conditions), table.c.kind == "index").limit(1)).first() is not None
         result = conn.execute(delete(table).where(*self.predicate(table, *conditions)))
-        if result.rowcount:
+        if result.rowcount and index_job:
             self._changed(conn, table)
         return result
 
-    def _changed(self, conn, table):
+    def _changed(self, conn, table, *, values=None, conditions=()):
+        if table.name == "jobs" and values is not None:
+            # Heartbeats/effect markers do not change source visibility or index
+            # status. Unrelated execution jobs must not invalidate catalog pages.
+            if not {"status", "cancel_requested", "kind"}.intersection(values):
+                return
+            if "kind" in values:
+                if values["kind"] != "index":
+                    return
+            elif conn.execute(select(table.c.id).where(*self.predicate(table, *conditions),
+                    table.c.kind == "index").limit(1)).first() is None:
+                return
         domain = {"memories": "memory", "memory_chunks": "memory",
                   "references_catalog": "references"}.get(table.name)
-        if domain:
+        domains = {domain} if domain else set()
+        if table.name.startswith(("knowledge_", "memory_index")) or table.name in {
+            "memories", "memory_chunks", "memory_versions", "metadata", "jobs",
+        }:
+            domains.add("rag-catalog")
+        if domains:
             if "cache_changes" not in conn.info:
                 raise StorageError("Cached data writes require WorkspaceDatabase.transaction")
-            conn.info["cache_changes"].add((self.workspace_id, domain))
+            for changed_domain in domains:
+                conn.info["cache_changes"].add((self.workspace_id, changed_domain))
 
     def revision(self, domain):
         rows = self.rows(counters, counters.c.name == "cache-version:" + domain)
