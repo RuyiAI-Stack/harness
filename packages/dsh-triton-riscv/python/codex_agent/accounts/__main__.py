@@ -1,5 +1,6 @@
 """Administrative account commands; never exposed as model tools."""
 import argparse
+import json
 from pathlib import Path
 
 from .config import load_config
@@ -12,6 +13,7 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("serve")
     sub.add_parser("invite")
+    sub.add_parser("list-users")
     for name in ("disable", "enable"):
         sub.add_parser(name).add_argument("username")
     template = sub.add_parser("template")
@@ -37,6 +39,12 @@ def main():
         try:
             if args.command == "invite":
                 print(accounts.invite())
+            elif args.command == "list-users":
+                from sqlalchemy import select
+                from .schema import users
+                with accounts.engine.connect() as conn:
+                    rows = conn.execute(select(users.c.id, users.c.username, users.c.status).order_by(users.c.username)).mappings()
+                    print(json.dumps([dict(row) for row in rows]))
             else:
                 accounts.set_status(args.username.strip().lower(), args.command == "enable")
                 print("Account status updated; previous login sessions revoked")

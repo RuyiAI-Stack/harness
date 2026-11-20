@@ -16,6 +16,8 @@ from sqlalchemy.exc import IntegrityError
 from codex_agent.storage.database import engine
 from .schema import audit, invitations, users
 
+MIN_PASSWORD_LENGTH = 6
+
 
 class AccountError(Exception):
     def __init__(self, status, message):
@@ -32,8 +34,8 @@ def digest(text):
 
 
 def password_ok(password):
-    if not isinstance(password, str) or not 12 <= len(password) <= 128 or len(password.encode()) > 512:
-        raise AccountError(400, "Password must contain 12 to 128 characters")
+    if not isinstance(password, str) or not MIN_PASSWORD_LENGTH <= len(password) <= 128 or len(password.encode()) > 512:
+        raise AccountError(400, f"Password must contain {MIN_PASSWORD_LENGTH} to 128 characters")
 
 
 class Accounts:

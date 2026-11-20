@@ -22,6 +22,7 @@ if (retired.length) throw new Error(`Package includes retired LangGraph files: $
 for (const file of [
   'native.js',
   'lib/native-adapter.js',
+  'lib/parallel-adapter.js',
   'lib/tool-policy.js',
   'lib/native-bridge.js',
   'lib/native-state.js',
@@ -35,6 +36,11 @@ for (const file of [
   'prompts/4-verification.md',
   'python/codex_agent/harness/native_bridge.py',
   'python/codex_agent/harness/mcp_server.py',
+  'python/codex_agent/harness/delegation.py',
+  'python/codex_agent/harness/delegation_api.py',
+  'python/codex_agent/harness/replica.py',
+  'python/codex_agent/harness/replica-policy.mjs',
+  'python/codex_agent/harness/parallel-policy.mjs',
   'python/codex_agent/orchestration/roles.py',
   'python/codex_agent/orchestration/prompts.py',
   'python/codex_agent/orchestration/runtime.py',
@@ -63,6 +69,7 @@ for (const file of [
   'python/codex_agent/harness/bundle/policy.md',
   'python/codex_agent/harness/bundle/lib/prompts.js',
   'python/codex_agent/harness/bundle/lib/tool-policy.js',
+  'python/codex_agent/harness/bundle/lib/parallel-adapter.js',
   'python/codex_agent/harness/bundle/lib/native-workspace.js',
   'python/codex_agent/harness/bundle/prompts/4-verification.md',
 ]) {

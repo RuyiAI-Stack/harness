@@ -376,4 +376,55 @@ For team deployment use an HTTPS origin behind a trusted reverse proxy, retain t
 Host header, disable proxy buffering for SSE, and keep backend/services private.
 This is not native Harness SSO or a sandbox for hostile public users. Historical data
 is unchanged and not assigned to new accounts. Public signup, password recovery,
-shared/team libraries and multi-host scaling are not implemented.
+platform SSO and multi-host scaling are not implemented.
+
+### Admin Knowledge Library
+
+Run the schema upgrade above against a backed-up database. To identify a local administrator:
+
+```sh
+.venv/bin/python -I -m codex_agent.accounts --config /path/to/accounts.json list-users
+```
+
+Add `"admin_user_ids": ["EXACT_USER_ID"]` and `"knowledge_enabled": true` to that
+private account config, then restart the gateway. Username, browser headers and
+model output never grant admin access. This temporary local policy is not platform SSO.
+
+Configure the existing `indexing` options (Embedding provider/model/dimensions and Qdrant)
+and `TRITON_AMQP_URL`. The gateway starts dedicated relay, recovery and index workers.
+In **管理后台 → 文档管理**, paste text or import `.txt`/`.md`, review it, then
+choose **确认加入共享 RAG / 确认修改并更新 RAG** to index and publish.
+For PDF/DOCX and PNG/JPG/JPEG: upload, wait for parsing, review/edit the extracted sections,
+then choose **确认修改并更新 RAG** to index and publish. Saving a draft alone does not publish it.
+Image previews highlight the selected OCR block. Originals are private admin downloads;
+retrieved chunks retain page/paragraph/table locations or image text regions. Parsing works without an
+embedding provider; indexing requires one. Restart workers after dependency upgrades.
+
+Limits: 12 MiB/file, 300 PDF pages, 1 million extracted characters, 512 MiB of originals.
+Standalone images use local Tesseract with `chi_sim` and `eng` language data:
+
+```sh
+# macOS (supported Homebrew release)
+brew install tesseract tesseract-lang
+# Debian/Ubuntu
+sudo apt-get install tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-eng
+```
+
+Images are limited to 12 megapixels and 16000 pixels per side. Animated images are rejected.
+OCR runs with a 25-second deadline inside a credential-free, resource-limited parser;
+empty/failed OCR cannot be indexed. Review scores and coordinates are retained, but
+scores do not guarantee correctness. Only reviewed OCR **text** is embedded; this is
+not image-vector retrieval. PDF scans, embedded images, diagram relations and formula
+recognition are not enabled by this feature. Encrypted files, macros and unsafe archives
+are rejected or flagged. Tables and reading order need manual review. No cloud
+parser is called. Back up both MySQL and the account data directory (including originals).
+Only published, fully indexed versions enter workbench chat context; failed updates
+leave the previous published version available. Use search preview to inspect evidence.
+Changing the embedding configuration requires new indexed document versions.
+The catalog supports title/source search and publication filters. Edit a document to
+save a new version; confirm the update to index and publish it. Delete moves it to the recycle
+bin and immediately unpublishes it. Restore keeps it unpublished. Originals and
+versions are retained, not physically erased; already-sent chat messages are unchanged.
+Account statistics exclude private message contents and credentials. Sources remain
+untrusted reference data, not tool instructions. Shared knowledge is disabled by default;
+this entry point does not change native Harness UI or operator-specific memory.

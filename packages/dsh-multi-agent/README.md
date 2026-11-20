@@ -72,6 +72,12 @@ strict JSON Schema validation with duplicate keys, non-finite constants and
 external schema retrieval rejected. Existing domain wrappers can retain their
 own parser and evidence/version checks. Usage is shared, not reimplemented.
 
+Python hosts can use `RoutingPolicy.select()` with trusted low-risk task facts and
+input byte size to choose a configured fast/strong model. This pure policy returns
+an auditable decision and fingerprint; it never calls a model, changes permissions
+or retries. Domain classification and applying the decision belong to the caller.
+The `ctx.multiAgent` JavaScript task registry still uses its configured model.
+
 ## Boundaries
 
 Harness already provides `ctx.subagents`, `subagent-spawn-in-process`, and

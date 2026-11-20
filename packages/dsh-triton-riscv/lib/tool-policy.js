@@ -3,6 +3,9 @@ const PREFIX = 'mcp__triton_riscv__'
 export const OPERATOR_TOOLS = new Set(
   [
     'discover_operator',
+    'prepare_parallel_tasks',
+    'execute_parallel_tasks',
+    'get_parallel_tasks',
     'read_operator_file',
     'check_validation_environment',
     'inspect_project',

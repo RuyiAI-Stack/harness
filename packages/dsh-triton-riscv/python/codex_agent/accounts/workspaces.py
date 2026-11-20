@@ -56,6 +56,8 @@ class Workbenches:
     def __init__(self, accounts):
         self.accounts, self.config = accounts, accounts.config
         self.children, self.lock = {}, threading.RLock()
+        from codex_agent.knowledge.processes import KnowledgeWorkers
+        self.knowledge_workers = KnowledgeWorkers(self.config)
         self.socket_dir = None
         self.file_lock = None
         self.config.data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -82,6 +84,11 @@ class Workbenches:
             raise RuntimeError("Another account gateway owns this data directory") from None
         # macOS TMPDIR paths can already exceed AF_UNIX's 104-byte pathname limit.
         self.socket_dir = tempfile.TemporaryDirectory(prefix="triton-accounts-", dir="/tmp")
+        try:
+            self.knowledge_workers.start()
+        except BaseException:
+            self.close()
+            raise
 
     def provision(self, uid):
         root = (self.config.data_dir / "workspaces" / uid).resolve()
@@ -119,16 +126,25 @@ class Workbenches:
 
     def environment(self, root, uid, key):
         cfg = runtime_config()
+        if cfg.storage.urlEnv.startswith("TRITON_RAG_HISTORY_"):
+            raise AccountError(503, "The history credential prefix is reserved for gateway reads")
         if any((cfg.permissions.development, cfg.permissions.repair, cfg.permissions.validation)) and not cfg.remote.required:
             raise AccountError(503, "Account execution requires a configured, isolated remote validator")
         child = cfg.model_copy(update={"repoRoot": str(root), "stateDir": str(root / "agent-results")})
         env = dict(os.environ)
+        for name in tuple(env):
+            if name.startswith("TRITON_RAG_HISTORY_"):
+                env.pop(name)
         for name in ("DSH_HOME", "DSH_SESSION_ROOT", "TRITON_RISCV_CORDIS_CONFIG", "PYTHONPATH", "PYTHONHOME"):
             env.pop(name, None)
         env.update({CONFIG_ENV: child.model_dump_json(), OWNER_ENV: uid, GATEWAY_ENV: key,
             "TRITON_RISCV_REPO_ROOT": str(root), "TRITON_RISCV_STATE_DIR": str(root / "agent-results"),
             "DSH_SESSION_ROOT": str(root / "agent-results/deepseek-harness"),
             "TRITON_RISCV_REQUIRE_APPROVED_VALIDATION": "1"})
+        from codex_agent.knowledge.vectors import ROOT_ENV
+        env.pop(ROOT_ENV, None)
+        if self.config.knowledge_enabled:
+            env[ROOT_ENV] = str(self.config.data_dir / "knowledge")
         return env
 
     def get(self, uid):
@@ -213,6 +229,7 @@ class Workbenches:
         while True:
             await asyncio.sleep(2)
             try:
+                await asyncio.to_thread(self.knowledge_workers.monitor)
                 active = await asyncio.to_thread(active_accounts)
                 for uid in list(self.children):
                     if uid not in active:
@@ -225,6 +242,7 @@ class Workbenches:
                     await asyncio.to_thread(self.stop, uid)
 
     def close(self):
+        self.knowledge_workers.close()
         for uid in list(self.children):
             self.stop(uid)
         if self.socket_dir:

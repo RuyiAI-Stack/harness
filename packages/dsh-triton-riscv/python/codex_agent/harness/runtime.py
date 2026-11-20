@@ -115,8 +115,14 @@ class DeepSeekHarnessBackend:
             runtime_env["ISRC_BASE_URL"] = self.settings.base_url
 
         self._home = tempfile.TemporaryDirectory(prefix="triton-chat-sdk-")
+        from codex_agent.harness.delegation import SCOPE_ENV, SCOPE
+        runtime_env[SCOPE_ENV] = str(Path(self._home.name) / "parallel-scope.json")
+        runtime_env["DSH_PROVIDER"] = self.settings.provider
         try:
             profile = write_profile(Path(self._home.name), kernel() + [{
+                "id": "parallel-parent-guard", "name": str(Path(__file__).with_name("parallel-policy.mjs")),
+                "config": {"typedOnly": SCOPE.get() is not None},
+            }, {
                 "id": "triton-composition", "name": "cordis:include",
                 "config": {"path": (Path(self._home.name) / "profiles/triton/domain.yml").as_uri()},
             }])
@@ -155,11 +161,16 @@ class DeepSeekHarnessBackend:
             # preserves session shell state and avoids sharing its stdio transport
             # unsafely across worker threads.
             with self._lock:
-                result = self._runtime().run(
-                    prompt,
-                    session_id=session_id,
-                    on_notification=forward_notification,
-                )
+                runtime = self._runtime()
+                from codex_agent.harness.delegation import SCOPE
+                from codex_agent.execution_guard import atomic_json
+                scope_path = Path(self._home.name) / "parallel-scope.json"
+                scope = SCOPE.get()
+                atomic_json(scope_path, {**scope, "base_model": self.settings.routing_base_model or self.settings.model} if scope else {})
+                try:
+                    result = runtime.run(prompt, session_id=session_id, on_notification=forward_notification)
+                finally:
+                    atomic_json(scope_path, {})
         except Exception as error:
             raise HarnessUnavailableError(f"DeepSeek Harness run failed: {error}") from error
 
@@ -192,6 +203,9 @@ class HarnessAgent:
     ) -> None:
         self.settings = settings
         self.backend = backend or DeepSeekHarnessBackend(settings)
+        self._custom_backend = backend is not None
+        self._backends = {}
+        self._routing_lock = threading.Lock()
 
     def prepare(self, user_request: str) -> str:
         return build_task_prompt(user_request, self.settings)
@@ -202,8 +216,31 @@ class HarnessAgent:
         session_id: Optional[str] = None,
         on_event: Optional[HarnessEventCallback] = None,
     ) -> HarnessRunResult:
-        return self.backend.run(
-            self.prepare(user_request),
+        from codex_agent.harness.model_routing import select_route, routed_settings
+        from codex_agent.harness.delegation import SCOPE
+        prompt = self.prepare(user_request)
+        raw_request = (SCOPE.get() or {}).get("user_request", user_request)
+        route = select_route(self.settings, raw_request, prompt)
+        # A parent turn may await several child batches or a validation tool.
+        # Preserve its outer request deadline; per-role/child limits stay separate.
+        route["timeout_seconds"] = self.settings.request_timeout_seconds
+        if not self.settings.managed_context:
+            # SDK sessions cannot move between processes without restoring their log.
+            # The unmanaged legacy path keeps its existing model and live history.
+            route.update(tier="default", model=self.settings.model, reason="unmanaged_session_keeps_model")
+        backend = self.backend
+        if self._custom_backend and route["tier"] != "default":
+            raise ValueError("Automatic routing requires the managed Harness backend")
+        if route["tier"] != "default" and not self._custom_backend:
+            with self._routing_lock:
+                key = (route["model"], route["timeout_seconds"], route["policy_fingerprint"])
+                if key not in self._backends:
+                    self._backends[key] = DeepSeekHarnessBackend(routed_settings(self.settings, route))
+                backend = self._backends[key]
+        if on_event is not None:
+            on_event({"method": "model.route", "payload": {**route, "scope": "chat"}})
+        return backend.run(
+            prompt,
             session_id=session_id,
             on_event=on_event,
         )
@@ -212,3 +249,6 @@ class HarnessAgent:
         close = getattr(self.backend, "close", None)
         if close is not None:
             close()
+        for backend in self._backends.values():
+            backend.close()
+        self._backends.clear()

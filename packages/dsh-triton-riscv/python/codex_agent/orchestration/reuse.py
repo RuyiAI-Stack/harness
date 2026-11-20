@@ -33,11 +33,13 @@ def preparation_scope(root, task, seed, contract, agent):
             return None
     except (OSError, ValueError):
         return None
-    return digest(dict(policy=POLICY_VERSION, prompt=prompts.PROMPT_VERSION, sdk=sdk, model=identity,
+    config = runtime_config()
+    routing = {"model_routing": config.modelRouting.model_dump(mode="json")} if config.modelRouting.enabled else {}
+    return digest(dict(policy=POLICY_VERSION, prompt=prompts.PROMPT_VERSION, sdk=sdk, model=identity, **routing,
         workflow_policy=task["policy_version"], operator=task["operator"],
         requirement=task["request"]["requirement"], contract=contract.model_dump(mode="json"),
         evidence=[item.model_dump(mode="json") for item in seed.evidence],
-        remote=runtime_config().remote.model_dump(mode="json"),
+        remote=config.remote.model_dump(mode="json"),
         environment_script=environment_script))
 
 

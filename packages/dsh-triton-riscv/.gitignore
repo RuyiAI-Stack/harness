@@ -7,6 +7,7 @@ python/*.egg-info/
 python/codex_agent/frontend/
 python/codex_agent/harness/bundle/
 __pycache__/
+.pytest_cache/
 *.pyc
 .state/
 .runtime/
@@ -19,3 +20,4 @@ __pycache__/
 !lib/config.js
 !lib/prompts.js
 !lib/tool-policy.js
+!lib/parallel-adapter.js

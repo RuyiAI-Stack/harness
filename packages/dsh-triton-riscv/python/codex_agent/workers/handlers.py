@@ -17,8 +17,18 @@ def execute_job(root, identifier, owner, *, proposal_agent=None):
     try:
         from codex_agent.runtime_config import runtime_config
         if job["kind"] == "index":
-            from codex_agent.indexing.worker import execute_index
-            execute_index(jobs, job, owner)
+            if payload.get("domain") == "knowledge-parse":
+                from codex_agent.knowledge.files import execute_parse
+                execute_parse(jobs, job, owner)
+            elif payload.get("domain") == "knowledge":
+                from codex_agent.knowledge.vectors import execute_knowledge_index
+                execute_knowledge_index(jobs, job, owner)
+            elif payload.get("domain") == "knowledge-cleanup":
+                from codex_agent.knowledge.cleanup import execute_cleanup
+                execute_cleanup(jobs, job, owner)
+            else:
+                from codex_agent.indexing.worker import execute_index
+                execute_index(jobs, job, owner)
             return
         if not runtime_config().queue.enabled:
             raise PermissionError("task queue is disabled")
@@ -119,6 +129,10 @@ def execute_job(root, identifier, owner, *, proposal_agent=None):
     except LeaseLost:
         raise
     except Exception as error:
+        from codex_agent.knowledge.lifecycle import DocumentUnavailable
+        if isinstance(error, DocumentUnavailable) and payload.get("domain") in {"knowledge", "knowledge-parse", "knowledge-cleanup"}:
+            jobs.finish(identifier, owner, "cancelled", {"reason": "Document deleted or lifecycle superseded"})
+            return
         # Never return an arbitrary SDK exception which could contain a credential URL.
         result = {"error_type": type(error).__name__, "reason": "Worker failed; inspect task artifacts and evidence"}
         if isinstance(error, PermissionError):

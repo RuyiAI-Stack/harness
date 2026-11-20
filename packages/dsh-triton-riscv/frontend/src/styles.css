@@ -122,6 +122,10 @@ a { color: var(--blue); text-underline-offset: 3px; }
 .message-body ul { margin: 6px 0 10px; padding-left: 20px; }
 .message-body code { padding: 2px 5px; overflow-wrap: anywhere; word-break: break-word; white-space: pre-wrap; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-raised); color: var(--code); font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; }
 .message-body a, .message-body pre { overflow-wrap: anywhere; word-break: break-word; }
+.message-body a { color: var(--code); text-decoration: underline; text-underline-offset: 3px; }
+.message-body a:hover { text-decoration-thickness: 2px; }
+.message-body pre { margin: 10px 0; padding: 10px; overflow: auto; white-space: pre-wrap; background: var(--surface-raised); border: 1px solid var(--line); border-radius: 4px; }
+.message-body pre code { padding: 0; border: 0; }
 .typing-cursor { display: inline-block; width: 2px; height: 1em; margin-left: 3px; vertical-align: -2px; background: var(--green); animation: cursor-blink 0.8s steps(1) infinite; }
 @keyframes cursor-blink { 50% { opacity: 0; } }
 .typing-indicator { display: flex; align-items: center; gap: 5px; min-width: 54px; min-height: 40px; }
@@ -160,6 +164,17 @@ a { color: var(--blue); text-underline-offset: 3px; }
 .approved-actions { align-items: center; justify-content: space-between; }
 .approved-actions span { color: var(--green-dark); font-size: 11px; }
 .proposal-error { color: var(--red) !important; }
+.parallel-plan-review { min-width: 0; overflow-wrap: anywhere; }
+.parallel-plan-review .parallel-refresh { width: 32px; min-height: 32px; padding: 0; flex: 0 0 32px; }
+.parallel-tasks { margin: 10px 0; padding-left: 20px; color: var(--ink); font-size: 12px; line-height: 1.55; }
+.parallel-tasks li + li { margin-top: 6px; }
+.parallel-plan-review .fact-list div { grid-template-columns: 88px minmax(0, 1fr); }
+.parallel-context { margin-top: 12px; color: var(--ink); font-size: 12px; line-height: 1.55; }
+.parallel-context summary { cursor: pointer; }
+.parallel-context dl { margin: 10px 0 0; }
+.parallel-context dt { color: var(--muted); }
+.parallel-context dd { margin: 5px 0 12px; }
+.parallel-context pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
 .fact-list { margin: 0; }
 .fact-list div { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
 .fact-list div:last-child { border: 0; }
@@ -171,7 +186,7 @@ a { color: var(--blue); text-underline-offset: 3px; }
 .run-state.running, .run-state.preparing, .run-state.planning_tests, .run-state.implementing, .run-state.reviewing, .run-state.applying, .run-state.waiting_validation { border-color: #415777; background: var(--blue-soft); color: var(--blue); }
 .run-state.failed, .run-state.verified-failed, .run-state.invalid { border-color: #654044; background: var(--red-soft); color: var(--red); }
 .run-state.completed, .run-state.succeeded, .run-state.verified-passed, .run-state.approved { border-color: #416052; background: var(--green-soft); color: var(--green); }
-.run-state.planned, .run-state.pending_approval, .run-state.waiting_approval, .run-state.waiting_validation_approval, .run-state.blocked, .run-state.needs_reconciliation { border-color: #62513a; background: var(--amber-soft); color: var(--amber); }
+.run-state.planned, .run-state.pending_approval, .run-state.waiting_approval, .run-state.waiting_parallel_approval, .run-state.waiting_validation_approval, .run-state.blocked, .run-state.needs_reconciliation { border-color: #62513a; background: var(--amber-soft); color: var(--amber); }
 .evidence-facts { margin-top: 10px; }
 .evidence-reason { margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .timeline { margin: 14px 0 0; padding: 0; list-style: none; }
@@ -268,6 +283,7 @@ a { color: var(--blue); text-underline-offset: 3px; }
 .workflow-requirement {
   border-left: 3px solid var(--blue);
   padding: 0 12px;
+  margin: 14px 0;
 }
 .workflow-requirement p {
   margin: 0;
@@ -290,6 +306,10 @@ a { color: var(--blue); text-underline-offset: 3px; }
   border-top: 1px solid var(--line);
   padding-top: 14px;
   margin-top: 16px;
+}
+.workflow-approval.awaiting-decision {
+  margin-top: 8px;
+  padding-top: 8px;
 }
 .workflow-approval pre {
   padding: 12px;

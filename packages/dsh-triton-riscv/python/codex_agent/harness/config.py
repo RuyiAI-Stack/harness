@@ -43,6 +43,7 @@ class HarnessSettings:
     context_output_reserve_tokens: int = 2_048
     context_recent_turns: int = 4
     context_summary_mode: str = "model"
+    routing_base_model: Optional[str] = None
 
     @classmethod
     def from_env(

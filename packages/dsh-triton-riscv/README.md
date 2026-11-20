@@ -70,6 +70,43 @@ Validate relu_and_mul. Show the plan and run it after my approval.
 
 For remote tests, set `remote.host` and `remote.repository`; the server needs SSH access and the Triton/Buddy/LLVM toolchain.
 
+### Parallel Analysis
+
+For complex independent investigations, the assistant can propose temporary replicas.
+Review their goals, context and model in the approval dialog/card before they start.
+Structured multi-agent workflows also support this optional step. Declining it
+resumes the normal sequential workflow; approving it adds read-only findings before implementation.
+Each replica runs its own Harness loop with read-only source and retrieval tools:
+2 concurrent replicas, up to 4 subtasks, 8 tool calls and at most 300 seconds per replica.
+Writes and tests still require separate lifecycle approval. Results are findings, not test passes.
+Replica calls use the configured Responses model route (`DSH_PROVIDER`, `DSH_MODEL`,
+`DSH_API_KEY_ENV`, `ISRC_BASE_URL`); native sessions must match that provider.
+The local capacity guard allows 4 replicas per OS user, not a cluster-wide quota.
+
+### Optional Model Routing
+
+Add to the plugin's `config` (or the workbench's versioned `TRITON_RISCV_CONFIG`):
+
+```yaml
+modelRouting:
+  enabled: true
+  fastModel: YOUR_FAST_MODEL_ID
+  strongModel: YOUR_STRONG_MODEL_ID
+  fastMaxInputBytes: 12000
+  fastTimeoutSeconds: 120
+  strongTimeoutSeconds: 300
+```
+
+Both IDs must be available through the current provider, endpoint and API key.
+Bounded information tasks may use `fast`; code, review and unclear tasks use `strong`.
+Missing `fastModel` uses the strong/current model. Routing is off by default.
+The byte limit is a conservative routing gate, not a token count or a context-window guarantee.
+Applies to managed workbench turns, proposal roles and approved replicas; native main-chat
+and unmanaged legacy sessions keep their host model. Child models are shown before approval;
+changed routing settings require a new plan. Errors do not trigger an extra paid retry.
+Role/child deadlines use the values above; parent turns retain their existing outer
+deadline so they can await child batches or validation tools.
+
 ### Optional Workbench
 
 After installation, run from the repository root:
@@ -89,6 +126,16 @@ Live requests need separate `ISRC_API_KEY` and `DSH_MODEL` settings. Workbench a
 For invite-only team access, use the [account gateway](python/codex_agent/README.md#account-gateway)
 instead of exposing the single-user workbench. It serves the same frontend with
 registration, login and private per-account workspaces. Native Harness login is separate.
+Passwords require 6 to 128 characters. This is a trusted-workbench policy, not a
+recommendation for public deployment; use strong, unique passwords.
+
+The optional [admin knowledge library](python/codex_agent/README.md#admin-knowledge-library)
+adds account usage totals, document/OCR review, shared RAG editing and search preview.
+
+**我的使用情况** shows the signed-in account's retained session/run counts and recent
+statuses, without message content or billing claims. Administrators can see aggregate
+account usage in **管理后台 → 账号概览**. Ordinary users cannot access management APIs.
+Published documents enrich workbench chat; private operator history stays separate.
 
 ### Optional Redis Cache
 
@@ -136,3 +183,51 @@ pnpm test:all
 ```
 
 For trusted local use only. Never commit credentials. Backend development commands are in [python/codex_agent/README.md](python/codex_agent/README.md).
+
+### Shared Knowledge Administration
+
+Enable the [admin knowledge library](python/codex_agent/README.md#admin-knowledge-library)
+in the account gateway. Native Harness login and UI are unchanged.
+
+1. Open **管理后台 → RAG 资料** to browse shared originals, versions and readable chunks.
+2. Select **管理 / 编辑此文档**, or use **文档管理** to add text, PDF, DOCX or PNG/JPEG files.
+3. Review extracted text, then choose **确认加入共享 RAG / 确认修改并更新 RAG**.
+4. Wait for **已发布到共享 RAG**. Saving a draft alone does not publish it.
+
+Confirmation queues indexing and publishes only the confirmed version after success.
+Failed updates retain the previous published version. After a timeout, check the
+operation receipt or retry the same request; do not submit another update blindly.
+Deletion immediately unpublishes the document and queues scoped vector cleanup.
+The recycle bin retains originals; restoration does not automatically republish them.
+
+**资料分类** groups shared copies by origin. **实际向量** checks the selected version's
+Qdrant count against its index record; an unavailable service is not an empty index.
+This is not a global Qdrant console and does not enumerate other collections or users.
+
+#### Optional Historical Sources
+
+Register old databases in the private account config under `rag_history_sources`:
+
+```json
+{
+  "id": "legacy",
+  "label": "Legacy operator reports",
+  "url_env": "TRITON_RAG_HISTORY_LEGACY_URL",
+  "workspace_ids": ["CANONICAL_64_CHARACTER_WORKSPACE_ID"],
+  "memory_mode": "qdrant",
+  "allow_share": true,
+  "vector_url": "http://127.0.0.1:6333"
+}
+```
+
+Use a read-only MySQL account and keep its URL in the named environment variable.
+Account-owned sources also require their active `owner_user_id`. Optional vector
+authentication uses `vector_api_key_env` with a `TRITON_RAG_HISTORY_` prefix.
+Historical originals stay read-only. **加入共享知识库** creates a draft copy;
+**编辑共享版本** edits that copy without overwriting the original.
+Only explicit confirmation publishes it to shared retrieval.
+
+Private workspaces are excluded from the current shared catalog. The old
+`rag_workspace_ids` field is accepted for compatibility but no longer grants catalog
+access. Use explicit historical sources instead; their credentials are not passed
+to ordinary user workbenches or knowledge workers.

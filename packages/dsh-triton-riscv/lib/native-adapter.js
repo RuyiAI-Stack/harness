@@ -1,6 +1,7 @@
 import { callBridge } from './native-bridge.js'
 import { createStateStore } from './native-state.js'
 import { createToolPolicy } from './tool-policy.js'
+import { parallelCall } from './parallel-adapter.js'
 
 const PREFIX = 'mcp__triton_riscv__'
 const APPLY = {
@@ -173,6 +174,10 @@ export function installNativeAdapter(ctx, { bridge = callBridge, store = createS
     try {
       const state = structuredClone(store.load(session.id))
       state.artifact_requests ||= {}
+      if (['prepare_parallel_tasks', 'execute_parallel_tasks', 'get_parallel_tasks'].includes(name)) {
+        return await parallelCall(ctx, exec, name, state, store, bridge, humanRequest(session),
+          approvalReason(session, humanRequest(session), 'Confirm the delegated goals, model and limits.'))
+      }
       if (name === 'validate_operator' && args.execute !== undefined && typeof args.execute !== 'boolean') {
         throw new Error('execute must be a boolean')
       }

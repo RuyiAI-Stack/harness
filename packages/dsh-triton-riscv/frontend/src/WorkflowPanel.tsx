@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from './api'
 import { accountName } from './auth'
 import { MessageText } from './format'
+import { WorkflowParallelPlan } from './WorkflowParallelPlan'
 import { workflowApi, type Workflow, type WorkflowSubmission } from './workflow-api'
 
 const phases: Record<string, string> = {
@@ -10,6 +11,7 @@ const phases: Record<string, string> = {
   planning_tests: '设计验收测试',
   implementing: '提出实现',
   reviewing: '独立审查',
+  waiting_parallel_approval: '等待并行审批',
   waiting_approval: '等待方案审批',
   applying: '写入代码',
   waiting_validation_approval: '等待验证审批',
@@ -42,23 +44,40 @@ export function WorkflowPanel({ sessionId, enabled }: { sessionId: string; enabl
   const [error, setError] = useState('')
   const pending = useRef<{ fingerprint: string; body: WorkflowSubmission } | null>(null)
   const generation = useRef(0)
+  const parallelRequest = useRef(false)
+  const parallelReadVersion = useRef(0)
+  const content = useRef<HTMLDivElement>(null)
+  const [parallelNeedsRefresh, setParallelNeedsRefresh] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (task?.state === 'waiting_parallel_approval' && content.current) content.current.scrollTop = 0
+  }, [task?.id, task?.state])
 
   useEffect(() => {
     const current = ++generation.current
     let timer: ReturnType<typeof setTimeout>
     let active = true
     const refresh = async () => {
+      const readVersion = parallelReadVersion.current
+      const isCurrent = () =>
+        active && current === generation.current &&
+        !parallelRequest.current && readVersion === parallelReadVersion.current
       try {
+        if (parallelRequest.current) return
         const items = await workflowApi.list(sessionId)
-        if (!active) return
+        if (!isCurrent()) return
         setRows(items)
         const id = selected || items[0]?.id
         if (id) {
           const detail = await workflowApi.get(id)
-          if (active && current === generation.current) setTask(detail)
+          if (isCurrent()) {
+            setTask(previous =>
+              previous?.id === detail.id && previous.revision > detail.revision ? previous : detail,
+            )
+          }
         } else setTask(null)
       } catch (reason) {
-        if (active) setError(reason instanceof Error ? reason.message : '读取任务失败')
+        if (isCurrent()) setError(reason instanceof Error ? reason.message : '读取任务失败')
       } finally {
         if (active) timer = setTimeout(() => void refresh(), 2000)
       }
@@ -66,6 +85,7 @@ export function WorkflowPanel({ sessionId, enabled }: { sessionId: string; enabl
     void refresh()
     return () => {
       active = false
+      generation.current += 1
       clearTimeout(timer)
     }
   }, [sessionId, selected])
@@ -116,6 +136,51 @@ export function WorkflowPanel({ sessionId, enabled }: { sessionId: string; enabl
   )
   const authorized = reviewer.trim().length > 0 && !busy && !blocked
   const command = (name: string) => task && act(() => workflowApi.action(task, name))
+  const parallelPlan = task?.parallel_plan
+  const waitingParallel = task?.state === 'waiting_parallel_approval'
+  const parallelInvalid = Boolean(
+    parallelPlan && (
+      parallelPlan.session_id !== sessionId || !parallelPlan.plan_id || !parallelPlan.digest ||
+      (parallelPlan.workflow_id !== undefined && parallelPlan.workflow_id !== task?.id)
+    ),
+  )
+
+  const updateParallel = async (approved?: boolean) => {
+    if (!task || busy || parallelRequest.current) return
+    if (
+      approved !== undefined && (
+        !enabled || blocked || parallelInvalid || parallelNeedsRefresh === task.id ||
+        task.state !== 'waiting_parallel_approval' || parallelPlan?.status !== 'pending' ||
+        parallelPlan.workflow_status === 'fallback'
+      )
+    ) return
+    parallelRequest.current = true
+    // Discard polls begun before or during this decision, including on HTTP failure.
+    parallelReadVersion.current += 1
+    const current = generation.current
+    setBusy(true)
+    setError('')
+    try {
+      const updated = approved === undefined
+        ? await workflowApi.get(task.id)
+        : await workflowApi.decideParallelPlan(task, approved)
+      if (current !== generation.current) return
+      if (updated.id !== task.id || updated.session_id !== sessionId || updated.revision < task.revision) {
+        throw new Error('任务标识或版本不匹配。')
+      }
+      setTask(updated)
+      setRows(items => items.map(item => item.id === updated.id ? updated : item))
+      setParallelNeedsRefresh(null)
+    } catch (reason) {
+      if (current !== generation.current) return
+      setParallelNeedsRefresh(task.id)
+      setError(`${reason instanceof Error ? reason.message : '提交并行决策失败'} 请刷新工作流并行计划后重新审查。`)
+    } finally {
+      parallelReadVersion.current += 1
+      parallelRequest.current = false
+      setBusy(false)
+    }
+  }
 
   const decide = async (approve: boolean) => {
     if (!task) return
@@ -169,13 +234,24 @@ export function WorkflowPanel({ sessionId, enabled }: { sessionId: string; enabl
           </button>
         </div>
       )}
-      <div className="workflow-content">
+      <div className="workflow-content" ref={content}>
         {task && (
           <>
             <h3>{task.operator}</h3>
-            <div className="workflow-requirement">
+            {waitingParallel && (
+              <WorkflowParallelPlan
+                plan={parallelPlan}
+                waiting
+                busy={busy}
+                disabled={!enabled || blocked || parallelInvalid || parallelNeedsRefresh === task.id}
+                onDecide={approved => void updateParallel(approved)}
+                onRefresh={() => void updateParallel()}
+              />
+            )}
+            <details className="workflow-requirement" key={task.id}>
+              <summary>原始需求</summary>
               <MessageText value={task.request.requirement} />
-            </div>
+            </details>
             <dl className="workflow-facts">
               <div>
                 <dt>任务 ID</dt>
@@ -213,6 +289,17 @@ export function WorkflowPanel({ sessionId, enabled }: { sessionId: string; enabl
                 </li>
               ))}
             </ol>
+            {parallelPlan && !waitingParallel && (
+              <WorkflowParallelPlan
+                plan={parallelPlan}
+                waiting={false}
+                busy={busy}
+                disabled={!enabled || blocked || parallelInvalid || parallelNeedsRefresh === task.id}
+                onDecide={approved => void updateParallel(approved)}
+                onRefresh={() => void updateParallel()}
+              />
+            )}
+            {parallelInvalid && <p role="alert">并行计划标识或摘要不匹配，请刷新后重新审查。</p>}
             {(task.result.reason || task.result.lifecycle?.reason || task.job?.result.reason) && (
               <p role="status">{task.result.reason || task.result.lifecycle?.reason || task.job?.result.reason}</p>
             )}

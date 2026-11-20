@@ -22,6 +22,21 @@ function forward(config: object, env: Record<string, string> = {}) {
 }
 
 describe('SDK MCP credential forwarding', () => {
+  it('passes only the declared model credential when the trusted host enables delegation', () => {
+    const env = forward(
+      {},
+      {
+        TRITON_PARALLEL_SCOPE: '/private/sdk/scope.json',
+        DSH_API_KEY_ENV: 'REPLICA_MODEL_KEY',
+        REPLICA_MODEL_KEY: 'fixture',
+        ISRC_API_KEY: 'other-model',
+        UNRELATED_SECRET: 'unrelated',
+      },
+    )
+    expect(env.REPLICA_MODEL_KEY).toBe('fixture')
+    expect(env).not.toHaveProperty('ISRC_API_KEY')
+    expect(env).not.toHaveProperty('UNRELATED_SECRET')
+  })
   it('forwards declared tool credentials even when ambient host credentials are scrubbed', () => {
     const forwarded = forward(
       {

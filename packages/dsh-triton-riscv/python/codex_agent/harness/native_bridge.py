@@ -123,6 +123,34 @@ def review_artifact(root: Path, kind: str, identifier: str, session_id: str) -> 
 
 
 def dispatch(root: Path, request: dict[str, Any]) -> dict[str, Any]:
+    if str(request.get("action", "")).startswith("parallel-"):
+        from codex_agent.harness.delegation import Plans
+        from codex_agent.harness.config import HarnessSettings
+        from dataclasses import replace
+        plans = Plans(root)
+        action, session = request["action"], request["session_id"]
+        settings = HarnessSettings.from_env(root)
+        selection = request.get("model_selection") or {}
+        if action in {"parallel-prepare", "parallel-execute"} and selection.get("provider") and selection["provider"] != settings.provider:
+            raise PermissionError("Configure the replica model route to match the current host provider")
+        if selection.get("model"):
+            settings = replace(settings, model=selection["model"])
+        if action == "parallel-prepare":
+            human = request["human"]
+            return plans.prepare({"session_id": session, "run_id": human["message_id"],
+                                  "user_request": human["text"]}, request["request"], settings)
+        identifier = request["id"]
+        if action == "parallel-get":
+            return plans.public(plans.load(identifier, session))
+        if action == "parallel-decide":
+            if type(request["approved"]) is not bool:
+                raise ValueError("approved must be a boolean")
+            return plans.decide(identifier, session, request["digest"], request["approved"], f"native-harness:{session}")
+        if action == "parallel-cancel":
+            return plans.cancel(identifier, session)
+        if action == "parallel-execute":
+            return plans.execute(identifier, session, settings)
+        raise ValueError("Unknown parallel host action")
     if request.get("action") in {"review", "decide", "refresh", "reconcile"}:
         key = f"artifact:{request['kind']}:{request['id']}"
         # No lock is held while the native dialog waits for the user. Recheck

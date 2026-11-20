@@ -397,7 +397,7 @@ it('real host guard denies generic bypass after activation, survives restore and
 
 it('real host + real stdio MCP: prepares, approves and applies in an isolated checkout', async () => {
   const h = await setup('allowed-once')
-  expect(h.ctx.tools.schemas(h.agent).filter(t => t.name.startsWith('mcp__triton_riscv__'))).toHaveLength(21)
+  expect(h.ctx.tools.schemas(h.agent).filter(t => t.name.startsWith('mcp__triton_riscv__'))).toHaveLength(24)
   const prepare = await h.call('prepare_operator_development', {
     specification: h.fixture.spec,
   })
@@ -656,7 +656,7 @@ it('starts without repoRoot, initializes once before first prompt, and exposes n
   const h = await setup('rejected', false, { noRepoRoot: true, initialize: false })
   expect(h.ctx.tools.schemas(h.agent)).toHaveLength(0)
   const first = await h.ctx.systemPrompt.assemble(assembleContextFor(h.agent))
-  expect(first.tools.filter(t => t.name.startsWith('mcp__triton_riscv__'))).toHaveLength(21)
+  expect(first.tools.filter(t => t.name.startsWith('mcp__triton_riscv__'))).toHaveLength(24)
   expect(h.ctx.tools.schemas()).toHaveLength(0)
   const again = await h.ctx.systemPrompt.assemble(assembleContextFor(h.agent))
   expect(again.tools).toEqual(first.tools)
@@ -776,7 +776,7 @@ it('does not let a nested agent borrow its parent workspace connection or contex
   })
   expect(before.isError).toBe(true)
   const assembly = await h.ctx.systemPrompt.assemble(assembleContextFor(child))
-  expect(assembly.tools.filter(t => t.name.startsWith('mcp__triton_riscv__'))).toHaveLength(21)
+  expect(assembly.tools.filter(t => t.name.startsWith('mcp__triton_riscv__'))).toHaveLength(24)
   expect(renderContextSnapshot(assembly)).not.toContain('synthetic:native-integration')
   expect(data(await h.call('discover_operator', { operator_name: 'square_new' }, child)).status).toBe('not_found')
 }, 60_000)

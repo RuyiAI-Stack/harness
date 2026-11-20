@@ -8,7 +8,8 @@ from codex_agent.operator_development import NewOperatorSpec
 from codex_agent.tasks.store import Conflict
 from codex_agent.runtime_config import runtime_config
 from .lifecycle import WorkflowLifecycle
-from .models import Contract, TaskRequest
+from .models import Contract, TaskRequest, Sha256
+from .parallel import WorkflowParallel
 from .roles import Evidence, OperatorContract
 from .service import WorkflowService
 from .usage_report import workflow_usage
@@ -25,6 +26,12 @@ class Submission(Contract):
 
 class Revision(Contract):
     expected_revision: int = Field(ge=1)
+
+
+class ParallelDecision(Revision):
+    plan_id: str = Field(pattern=r"^parallel-[a-f0-9]{32}$")
+    digest: Sha256
+    approved: bool
 
 
 def router(root):
@@ -72,6 +79,13 @@ def router(root):
     @routes.get("/{workflow_id}/usage")
     def usage(workflow_id: str):
         return call(lambda: workflow_usage(WorkflowLifecycle(root).jobs.db, workflow_id))
+
+    @routes.post("/{workflow_id}/parallel-decision")
+    def decide_parallel(workflow_id: str, body: ParallelDecision):
+        def action():
+            WorkflowParallel(root).decide(workflow_id, **body.model_dump())
+            return WorkflowLifecycle(root).view(workflow_id)
+        return call(action)
 
     @routes.post("/{workflow_id}/{action}")
     def act(workflow_id: str, action: Literal["publish", "apply", "plan-validation", "enqueue-validation", "collect-validation"],

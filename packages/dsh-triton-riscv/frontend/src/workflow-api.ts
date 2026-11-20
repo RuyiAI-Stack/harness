@@ -1,5 +1,11 @@
-import type { ProposalReview, ValidationPlanReview } from './types'
+import type { ParallelPlan, ProposalReview, ValidationPlanReview } from './types'
 import { authFetch } from './auth'
+
+export interface WorkflowParallelPlanView extends ParallelPlan {
+  workflow_id?: string
+  workflow_status?: string
+  fallback_reason?: string
+}
 
 export interface Workflow {
   id: string
@@ -36,6 +42,7 @@ export interface Workflow {
   acceptance?: Record<string, unknown> | null
   artifact_error?: string | null
   validation_plan?: ValidationPlanReview | null
+  parallel_plan?: WorkflowParallelPlanView | null
   job?: { id: string; status: string; result: { reason?: string } } | null
 }
 
@@ -74,4 +81,16 @@ export const workflowApi = {
       method: 'POST',
       body: JSON.stringify({ expected_revision: task.revision }),
     }),
+  decideParallelPlan: async (task: Workflow, approved: boolean) => {
+    if (!task.parallel_plan) throw new Error('并行计划尚未加载，请刷新后审查。')
+    return request<Workflow>(`/${encodeURIComponent(task.id)}/parallel-decision`, {
+      method: 'POST',
+      body: JSON.stringify({
+        expected_revision: task.revision,
+        plan_id: task.parallel_plan.plan_id,
+        digest: task.parallel_plan.digest,
+        approved,
+      }),
+    })
+  },
 }

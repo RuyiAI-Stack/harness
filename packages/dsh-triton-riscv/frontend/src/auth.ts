@@ -2,6 +2,7 @@ export interface AccountUser {
   id: string
   username: string
   csrf_token: string
+  is_admin?: boolean
 }
 let currentUser: AccountUser | null = null
 let accountRevision = 0
@@ -16,7 +17,7 @@ export function accountName() {
 export function accountStreamUrl(path: string) {
   if (!currentUser) return path
   const url = new URL(path, window.location.origin)
-  // EventSource cannot set custom headers. The account ID is not a credential.
+  // EventSource and file hyperlinks cannot set headers. This ID is not a credential.
   url.searchParams.set('account_id', currentUser.id)
   return url.pathname + url.search
 }
@@ -37,6 +38,12 @@ export async function authFetch(path: string, options: RequestInit = {}): Promis
   const json = response.json.bind(response)
   response.json = async () => {
     const body = await json()
+    assertCurrent()
+    return body
+  }
+  const blob = response.blob.bind(response)
+  response.blob = async () => {
+    const body = await blob()
     assertCurrent()
     return body
   }

@@ -35,7 +35,7 @@ it('blocks the workbench until login, then unmounts private data on logout', asy
   expect(screen.queryByText('private workspace')).not.toBeInTheDocument()
   await screen.findByRole('heading', { name: '登录工作台' })
   fireEvent.change(screen.getByLabelText('用户名'), { target: { value: 'alice' } })
-  fireEvent.change(screen.getByLabelText('密码'), { target: { value: 'long-test-password' } })
+  fireEvent.change(screen.getByLabelText('密码'), { target: { value: '123456' } })
   fireEvent.click(screen.getByRole('button', { name: '登录' }))
   await screen.findByText('private workspace')
   fireEvent.click(screen.getByRole('button', { name: '退出登录' }))
@@ -64,6 +64,32 @@ it('requires an invitation and returns to login after registration', async () =>
   fireEvent.click(screen.getByRole('button', { name: '注册账号' }))
   await screen.findByText('注册成功，请登录')
   expect(screen.queryByText('private')).not.toBeInTheDocument()
+})
+
+it('uses a browser-valid username pattern without changing allowed names', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(reply({}, 401)))
+  render(<AccountGate><div>private</div></AccountGate>)
+  const input = await screen.findByLabelText('用户名')
+  const pattern = new RegExp(`^(?:${input.getAttribute('pattern')})$`, 'v')
+  for (const value of ['alice', 'qa_alice_123', 'test-user', 'A12']) expect(pattern.test(value)).toBe(true)
+  for (const value of ['ab', '-alice', 'with space', 'user@example.com', 'a'.repeat(33)]) expect(pattern.test(value)).toBe(false)
+})
+
+it('uses a six-character minimum for registration and both new-password fields', async () => {
+  const fetch = vi.fn().mockResolvedValue(reply({}, 401))
+  vi.stubGlobal('fetch', fetch)
+  const view = render(<AccountGate><div>private</div></AccountGate>)
+  fireEvent.click(await screen.findByRole('tab', { name: '注册' }))
+  const password = screen.getByLabelText('密码')
+  expect(password).toHaveAttribute('minlength', '6')
+  fireEvent.change(password, { target: { value: '123456' } })
+  expect((password as HTMLInputElement).checkValidity()).toBe(true)
+  view.unmount()
+  fetch.mockResolvedValue(reply({ enabled: true, user }))
+  render(<AccountGate><div>private</div></AccountGate>)
+  fireEvent.click(await screen.findByRole('button', { name: '修改密码' }))
+  expect(screen.getByLabelText('新密码')).toHaveAttribute('minlength', '6')
+  expect(screen.getByLabelText('确认新密码')).toHaveAttribute('minlength', '6')
 })
 
 it('fails closed when the identity service is unavailable', async () => {

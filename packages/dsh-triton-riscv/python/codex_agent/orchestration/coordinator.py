@@ -17,6 +17,7 @@ from codex_agent.develop_operator import parse_operator_spec
 from .retrieval import role_evidence
 from .store import WorkflowStore
 from .reuse import preparation_scope, reuse_preparation
+from .parallel import WorkflowParallel
 
 
 class ProposalCoordinator:
@@ -28,6 +29,7 @@ class ProposalCoordinator:
         self.payload = json.loads(job["payload_json"])
         self.task_id = self.payload["workflow_id"]
         self.retriever = retriever or role_evidence
+        self.parallel = WorkflowParallel(self.root, jobs=jobs)
 
     def guard(self, conn):
         job = self.jobs.require_owner(conn, self.job["id"], self.owner)
@@ -52,16 +54,45 @@ class ProposalCoordinator:
             expected_revision=task["revision"], event_id="stop-" + str(task["revision"]))
 
     @staticmethod
-    def _blocked_reason(result, fallback):
+    def _blocked_reason(result, fallback, task=None):
         if result is None:
+            if task and task["steps"] and task["steps"][-1]["result"]:
+                return task["steps"][-1]["result"]["summary"]
             return fallback
         if result.unknowns:
             return "Unresolved requirements: " + "; ".join(result.unknowns)
         return result.summary
 
+    @staticmethod
+    def _rejected_call_summary(value):
+        if value.outcome == "incomplete":
+            # Provider error text may contain private details; expose known codes only.
+            messages = {
+                "RATE_LIMIT": "Model API rate limit (RATE_LIMIT); wait for provider capacity before submitting a new task.",
+                "AUTH": "Model API authentication failed (AUTH); check the configured credential.",
+                "TIMEOUT": "Model API request timed out (TIMEOUT); inspect the saved call before retrying.",
+                "TRANSPORT": "Model API connection failed (TRANSPORT); inspect the saved call before retrying.",
+                "SERVER": "Model API server failure (SERVER); inspect the saved call before retrying.",
+            }
+            for event in reversed(value.harness.events):
+                if not isinstance(event, dict) or event.get("type") != "turn/end":
+                    continue
+                error = event
+                for key in ("data", "reason", "error"):
+                    error = error.get(key) if isinstance(error, dict) else None
+                code = error.get("code") if isinstance(error, dict) else None
+                if isinstance(code, str) and code in messages:
+                    return messages[code] + " The role did not complete; no automatic workflow replay."
+            return "Model invocation did not complete; inspect its saved evidence before submitting a new task."
+        return "Role output rejected"
+
     def _load_output(self, step):
         if step["job_id"] != self.job["id"]:
-            raise Conflict("role step belongs to another job")
+            previous = self.jobs.get(step["job_id"])
+            if (previous["status"] != "succeeded" or previous["run_id"] != step["run_id"]
+                    or any(previous["payload"].get(key) != self.payload.get(key)
+                           for key in ("mode", "workflow_id", "session_id", "fingerprint"))):
+                raise Conflict("role step belongs to another workflow or unfinished job")
         return load_role_output(self.jobs.db, self.task_id, step)
 
     def _call(self, task, role, seed, contract, files):
@@ -81,7 +112,9 @@ class ProposalCoordinator:
             evidence.append(Evidence(id="workflow_contract", kind="contract", source="workflow contract proposal",
                 text=encode(contract.model_dump(mode="json")), verified=False))
         historical, retrieval = self.retriever(self.root, task, seed, role, task["state"])
-        evidence.extend(historical)
+        evidence.extend(self.parallel.evidence(task))
+        # Reserve one evidence slot for review feedback without displacing contracts.
+        evidence.extend(historical[:max(0, 31 - len(evidence))])
         if role == "implementer" and task["result"].get("review_feedback"):
             evidence.append(Evidence(id="workflow_review", kind="requirement", source="previous candidate review",
                 text=encode(task["result"]["review_feedback"])))
@@ -94,6 +127,9 @@ class ProposalCoordinator:
         request = RoleRequest(task_id=task["id"], step_id="preflight", input_epoch=task["input_epoch"],
             role=role, phase=task["state"], kind=task["kind"], operator=task["operator"],
             requirement=task["request"]["requirement"], versions=InputVersions.model_validate(task["versions"]),
+            parallel_status={"rejected": "declined", "completed": "completed", "partial": "partial",
+                             "fallback": "unavailable", "unknown": "unavailable", "cancelled": "unavailable"}.get(
+                                 task["result"].get("parallel", {}).get("status"), "not_requested"),
             evidence=evidence, files=list(files.values()), candidate=candidate, review_baseline=baseline)
         task_prompt(request)
         task = self.store.start_step(task["id"], {"role": role, "instruction": task["request"]["requirement"],
@@ -132,7 +168,7 @@ class ProposalCoordinator:
                                         step["id"] + ".json", encode(audit).encode())
         result = value.result if value.outcome == "validated" else None
         task = self.store.finish_step(task["id"], step["id"], {
-            "status": result.status if result else "failed", "summary": result.summary if result else "Role output rejected",
+            "status": result.status if result else "failed", "summary": result.summary if result else self._rejected_call_summary(value),
             "evidence_refs": result.evidence_refs if result else [], "artifact_id": artifact_id},
             expected_revision=task["revision"], event_id="finish-" + step["id"])
         return task, result
@@ -184,18 +220,22 @@ class ProposalCoordinator:
                     "implementing": "implementer", "reviewing": "reviewer"}[task["state"]]
             task, result = self._call(task, role, seed, contract, files)
             if result is None or result.status != "completed" or result.unknowns:
-                task = self._stop(task, self._blocked_reason(result, "Role output failed validation."))
+                task = self._stop(task, self._blocked_reason(result, "Role output failed validation.", task))
                 break
             if task["state"] == "preparing":
                 if result.decision in {"ask_user", "blocked"}:
                     task = self._stop(task, " ".join(result.questions) or result.summary)
                     break
+                if result.parallel_request is not None:
+                    task = self.parallel.handle(self, task, result.parallel_request)
+                    if task["state"] == "waiting_parallel_approval":
+                        break
                 # A frozen contract is authoritative. Re-extraction cannot update it
                 # and can turn a harmless wording change into a blocked repair.
                 if contract is None:
                     task, result = self._call(task, "semantic", seed, contract, files)
                     if result is None or result.status != "completed" or result.unknowns:
-                        task = self._stop(task, self._blocked_reason(result, "Semantic output rejected."))
+                        task = self._stop(task, self._blocked_reason(result, "Semantic output rejected.", task))
                         break
                     contract = result.contract
                     if result.specification is not None:
@@ -252,6 +292,8 @@ class ProposalCoordinator:
         return {"workflow_id": task["id"], "workflow_state": task["state"], "revision": task["revision"],
                 "preparation_reuse": task["result"].get("preparation_reuse"),
                 "validation": "not_started", "files_applied": False, "reason": task["result"].get("reason",
+                "Awaiting optional parallel research approval; declining continues sequentially."
+                if task["state"] == "waiting_parallel_approval" else
                 "Candidate proposal is ready for approval; no code was applied or tested."),
                 "artifact_ids": [s["result"].get("artifact_id") for s in task["steps"]]}
 
@@ -259,12 +301,11 @@ class ProposalCoordinator:
 def execute_workflow(jobs, job, owner, *, agent):
     result = ProposalCoordinator(jobs, job, owner, agent=agent).run()
     ArtifactStore(jobs.db.root).put(jobs, job["id"], owner, "result.json", encode(result).encode())
-    status = "succeeded" if result["workflow_state"] == "waiting_approval" else "failed"
-    jobs.finish(job["id"], owner, status, result)
+    status = "succeeded" if result["workflow_state"] in {"waiting_approval", "waiting_parallel_approval"} else "failed"
     if result["workflow_state"] == "waiting_approval":
         try:
             from .lifecycle import WorkflowLifecycle
-            lifecycle = WorkflowLifecycle(jobs.db.root)
+            lifecycle = WorkflowLifecycle(jobs.db.root, publication_owner=(job["id"], owner))
             task = lifecycle.store.get(result["workflow_id"])
             if task["request"].get("auto_publish"):
                 lifecycle.execute(task["id"], "publish", expected_revision=task["revision"])
@@ -272,3 +313,6 @@ def execute_workflow(jobs, job, owner, *, agent):
             # Publication failure must not replay a completed model job.
             import warnings
             warnings.warn("Proposal job saved; inspect workflow publication state before continuing.", RuntimeWarning)
+    # Keep the lease alive until publication finishes; otherwise the consumer
+    # observes the completed job and can kill a still-publishing child process.
+    jobs.finish(job["id"], owner, status, result)

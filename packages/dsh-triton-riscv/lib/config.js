@@ -66,10 +66,22 @@ function indexSettings(input, reserved) {
 export function resolveConfig(input = {}) {
   const c = object(
     input,
-    ['enabled', 'repoRoot', 'python', 'stateDir', 'permissions', 'remote', 'memory', 'storage', 'cache', 'queue', 'indexing'],
+    ['enabled', 'repoRoot', 'python', 'stateDir', 'permissions', 'remote', 'memory', 'storage', 'cache', 'queue', 'indexing', 'modelRouting'],
     'triton-riscv config',
   )
   const p = object(c.permissions, ['validation', 'development', 'repair'], 'permissions')
+  const routingDefaults = { enabled: false, fastModel: '', strongModel: '', fastMaxInputBytes: 12000,
+    fastTimeoutSeconds: 120, strongTimeoutSeconds: 300 }
+  const modelRouting = { ...routingDefaults, ...object(c.modelRouting, Object.keys(routingDefaults), 'modelRouting') }
+  modelRouting.enabled = boolean(modelRouting.enabled, false, 'modelRouting.enabled')
+  for (const name of ['fastModel', 'strongModel']) {
+    const value = modelRouting[name]
+    if (typeof value !== 'string' || value.length > 256 || /[\x00-\x1f]/.test(value) || value !== value.trim())
+      throw new Error('Invalid modelRouting.' + name)
+  }
+  for (const [name, [min, max]] of Object.entries({ fastMaxInputBytes: [256, 64000], fastTimeoutSeconds: [30, 300], strongTimeoutSeconds: [30, 300] }))
+    if (!Number.isInteger(modelRouting[name]) || modelRouting[name] < min || modelRouting[name] > max)
+      throw new Error('Invalid modelRouting.' + name)
   const r = object(c.remote, ['host', 'repository', 'required', 'requireTaskQuotas'], 'remote')
   const m = object(c.memory, ['retrievalMode', 'contextFormat', 'embedding'], 'memory')
   const e = object(
@@ -207,6 +219,7 @@ export function resolveConfig(input = {}) {
     python,
     stateDir,
     storage,
+    modelRouting,
     cache,
     queue,
     indexing: indexSettings(c.indexing, [storage.urlEnv, cache.urlEnv, queue.urlEnv]),

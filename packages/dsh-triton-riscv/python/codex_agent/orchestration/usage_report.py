@@ -62,10 +62,44 @@ def aggregate_calls(calls):
                       and not value.get("issues") and all(a["closed"] for a in value["attempts"]) for value in usages),
                   role_elapsed_ms=sum(value["elapsed_ms"] for value in usages) if usages and all(usages) else None,
                   known_role_elapsed_ms=sum(value["elapsed_ms"] for value in usages if value),
-                  unsuccessful_invocations=sum(value["outcome"] != "validated" or value.get("role_status") != "completed"
-                                               for value in usages if value),
+                  unsuccessful_invocations=sum(
+                      (value["outcome"] != "completed" if call["role"] == "replica" else
+                       value["outcome"] != "validated" or value.get("role_status") != "completed")
+                      for call, value in zip(calls, usages) if value),
                   cost=None, cost_status="pricing_not_configured")
     return result
+
+
+def parallel_calls(db, task):
+    from .parallel import WorkflowParallel
+    from codex_agent.tasks.store import JobStore
+    link = task["result"].get("parallel", {})
+    if not link or not link.get("approved"):
+        return []
+    try:
+        plan = WorkflowParallel(db.root, jobs=JobStore(db.root, database=db)).view(task)
+    except (ValueError, OSError):
+        return [{"workflow_id": task["id"], "role": "replica", "phase": "parallel_research",
+                 "usage": None, "error": "parallel_artifact_unavailable"}]
+    if plan["status"] in {"pending", "approved", "rejected"}:
+        return []
+    output = []
+    for child in plan["tasks"]:
+        result = next((r for r in plan["results"] if r.get("task_id") == child["task_id"]), {})
+        usage = result.get("usage")
+        if (not isinstance(usage, dict) or usage.get("schema_version") != 1
+                or not isinstance(usage.get("totals"), dict) or not isinstance(usage.get("attempts"), list)
+                or not count(usage.get("attempt_count")) or usage["attempt_count"] != len(usage["attempts"])
+                or not all(isinstance(a, dict) and type(a.get("closed")) is bool for a in usage["attempts"])
+                or type(usage.get("elapsed_ms")) not in (int, float)
+                or not math.isfinite(usage["elapsed_ms"]) or usage["elapsed_ms"] < 0
+                or not isinstance(usage.get("outcome"), str)):
+            usage = None
+        output.append({"workflow_id": task["id"], "step_id": child["task_id"], "role": "replica",
+            "phase": "parallel_research", "step_status": result.get("status", "unknown"),
+            "job_id": link.get("continuation_job_id"), "input_epoch": link["input_epoch"],
+            "usage": usage, "error": None if usage else "usage_not_recorded"})
+    return output
 
 
 def workflow_usage(db, workflow_id):
@@ -89,7 +123,7 @@ def workflow_usage(db, workflow_id):
         seen.add(child["id"])
         tasks.append(child)
         task = child
-    calls = [call for task in tasks for call in workflow_calls(db, task)]
+    calls = [call for task in tasks for call in workflow_calls(db, task) + parallel_calls(db, task)]
     return {"schema_version": 1, "requested_workflow_id": workflow_id, "root_workflow_id": tasks[0]["id"],
             "scope": "workflow_and_linked_repairs", "totals": aggregate_calls(calls),
             "by_role": {role: aggregate_calls([c for c in calls if c["role"] == role])
@@ -101,7 +135,8 @@ def workflow_usage(db, workflow_id):
                           for task in tasks], "calls": calls,
             "notes": ["SDK-reported usage, not a provider bill; absent counters are unknown, not zero.",
                       "Role elapsed time includes SDK startup and waiting, not just model inference.",
-                      "Counts cover role calls only; embedding, ordinary chat, queue and validation time are excluded.",
+                      "Counts include role calls and approved read-only replicas; embedding, ordinary chat, queue and validation time are excluded.",
+                      "Parallel replica durations overlap; summed call durations are not workflow wall time.",
                       "A validated role proposal is not proof that operator tests passed.",
                       "Reused preparation is a host checkpoint, not a model call or measured token saving."]}
 

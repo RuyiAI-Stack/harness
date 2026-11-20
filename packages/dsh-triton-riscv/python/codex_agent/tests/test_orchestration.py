@@ -373,13 +373,15 @@ class WorkflowTests(unittest.TestCase):
             bounded({"log": "x" * 65536})
 
     def test_migration_is_repeatable_and_schema_matches_declared_columns(self):
+        from alembic.script import ScriptDirectory
         cfg = Config()
         cfg.set_main_option("script_location", str(Path(__file__).parents[1] / "storage/migrations"))
         with engine().connect() as conn:
             cfg.attributes["connection"] = conn
             command.upgrade(cfg, "head")
             command.upgrade(cfg, "head")
-            self.assertEqual(conn.execute(text("SELECT version_num FROM alembic_version")).scalar(), "0006_accounts")
+            self.assertEqual(conn.execute(text("SELECT version_num FROM alembic_version")).scalar(),
+                             ScriptDirectory.from_config(cfg).get_current_head())
             inspector = inspect(conn)
             for table in (tasks, steps, events):
                 self.assertEqual({c["name"] for c in inspector.get_columns(table.name)}, set(table.c.keys()))
